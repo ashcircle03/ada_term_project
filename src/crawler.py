@@ -242,7 +242,7 @@ class Crawler:
         중단 후 재개해도 이미 채워진 행은 스킵된다.
         """
         rows = conn.execute(
-            """SELECT product_id FROM listing
+            """SELECT product_id, seller_id FROM listing
                WHERE seller_id != '_pending_' AND condition IS NULL
                LIMIT ?""",
             (limit,),
@@ -253,6 +253,7 @@ class Crawler:
 
         for row in rows:
             pid = row["product_id"]
+            existing_seller_id = row["seller_id"]
             url = f"{config.BASE_URL}/product/{pid}/x"
             html = self.fetcher.get(url)
             if not html:
@@ -273,6 +274,10 @@ class Crawler:
                 fail += 1
                 conn.commit()
                 continue
+
+            # seller_id가 파싱 안 됐으면 기존 DB 값 보존
+            if not data.get("seller_id"):
+                data["seller_id"] = existing_seller_id
 
             try:
                 db.upsert_listing(conn, data)
