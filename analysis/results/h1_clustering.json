@@ -1,0 +1,244 @@
+{
+  "n_sellers": 26,
+  "best_k": 10,
+  "best_silhouette": 0.5070849970323722,
+  "all_k_silhouette": [
+    {
+      "k": 3,
+      "silhouette": 0.17951689334420948
+    },
+    {
+      "k": 4,
+      "silhouette": 0.261561399069773
+    },
+    {
+      "k": 5,
+      "silhouette": 0.3388679727950444
+    },
+    {
+      "k": 6,
+      "silhouette": 0.3841547824897172
+    },
+    {
+      "k": 7,
+      "silhouette": 0.43783710351761446
+    },
+    {
+      "k": 8,
+      "silhouette": 0.4852598954664439
+    },
+    {
+      "k": 9,
+      "silhouette": 0.48902669222849976
+    },
+    {
+      "k": 10,
+      "silhouette": 0.5070849970323722
+    },
+    {
+      "k": 11,
+      "silhouette": 0.4939896813627436
+    }
+  ],
+  "clusters": {
+    "0": {
+      "n_sellers": 3,
+      "keywords": [
+        "hysteric",
+        "glamour",
+        "히스테릭",
+        "글래머",
+        "rrl",
+        "comme",
+        "des",
+        "garcons",
+        "집업",
+        "double"
+      ],
+      "top_brands": [
+        "Hysteric Glamour",
+        "Comme des Garcons",
+        "RRL",
+        "Bape"
+      ]
+    },
+    "1": {
+      "n_sellers": 3,
+      "keywords": [
+        "stone",
+        "island",
+        "company",
+        "스톤아일랜드",
+        "스톤",
+        "후드티",
+        "cp",
+        "히스테릭",
+        "hatchingroom",
+        "martens"
+      ],
+      "top_brands": [
+        "Stone Island",
+        "C.P. Company"
+      ]
+    },
+    "2": {
+      "n_sellers": 2,
+      "keywords": [
+        "owens",
+        "rick",
+        "xl",
+        "자켓",
+        "glamour",
+        "mie",
+        "martens",
+        "island",
+        "hysteric",
+        "hatchingroom"
+      ],
+      "top_brands": [
+        "Chrome Hearts",
+        "Rick Owens",
+        "Givenchy",
+        "Enfants Riches Deprimes"
+      ]
+    },
+    "3": {
+      "n_sellers": 2,
+      "keywords": [
+        "hatchingroom",
+        "해칭룸",
+        "xl",
+        "double",
+        "히스테릭",
+        "glamour",
+        "mie",
+        "martens",
+        "island",
+        "hysteric"
+      ],
+      "top_brands": [
+        "Hatchingroom"
+      ]
+    },
+    "4": {
+      "n_sellers": 2,
+      "keywords": [
+        "martens",
+        "dr",
+        "mie",
+        "닥터마틴",
+        "히스테릭",
+        "hatchingroom",
+        "owens",
+        "island",
+        "hysteric",
+        "glamour"
+      ],
+      "top_brands": [
+        "Dr. Martens"
+      ]
+    },
+    "5": {
+      "n_sellers": 2,
+      "keywords": [
+        "엑슬림",
+        "sl",
+        "롱슬리브",
+        "glamour",
+        "mie",
+        "martens",
+        "island",
+        "hysteric",
+        "hatchingroom",
+        "garcons"
+      ],
+      "top_brands": [
+        "Sanyo",
+        "Kyocera",
+        "Canon",
+        "Olympus",
+        "Casio"
+      ]
+    },
+    "6": {
+      "n_sellers": 2,
+      "keywords": [
+        "rrl",
+        "히스테릭",
+        "glamour",
+        "owens",
+        "mie",
+        "martens",
+        "island",
+        "hysteric",
+        "hatchingroom",
+        "garcons"
+      ],
+      "top_brands": [
+        "RRL"
+      ]
+    },
+    "7": {
+      "n_sellers": 1,
+      "keywords": [
+        "스톤",
+        "히스테릭",
+        "glamour",
+        "owens",
+        "mie",
+        "martens",
+        "island",
+        "hysteric",
+        "hatchingroom",
+        "garcons"
+      ],
+      "top_brands": [
+        "925 Silver",
+        "SIGNATURE",
+        "Designer Collection",
+        "Vintage"
+      ]
+    },
+    "8": {
+      "n_sellers": 7,
+      "keywords": [
+        "백팩",
+        "company",
+        "comme",
+        "des",
+        "garcons",
+        "cp",
+        "히스테릭",
+        "hysteric",
+        "owens",
+        "mie"
+      ],
+      "top_brands": [
+        "Vivienne Westwood",
+        "J.L-A.L",
+        "Ignota",
+        "C.P. Company",
+        "Prada"
+      ]
+    },
+    "9": {
+      "n_sellers": 2,
+      "keywords": [
+        "adidas",
+        "아디다스",
+        "sl",
+        "집업",
+        "자켓",
+        "comme",
+        "company",
+        "cp",
+        "des",
+        "double"
+      ],
+      "top_brands": [
+        "Adidas"
+      ]
+    }
+  },
+  "_saved_at": "2026-04-28T12:05:22.869774"
+}

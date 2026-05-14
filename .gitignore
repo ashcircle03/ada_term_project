@@ -1,0 +1,20 @@
+# 환경
+.conda/
+__pycache__/
+*.pyc
+.DS_Store
+
+# 크롤링 raw HTML (336MB, 너무 큼)
+data/raw_html/
+
+# 캐시 (재생성 가능)
+data/cache/
+
+# 로그
+logs/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# DB는 포함 (4.1MB, 크롤 상태 보존용)
+# data/fruitsfamily.db → 포함됨

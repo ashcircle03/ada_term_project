@@ -1,0 +1,55 @@
+{
+  "kruskal_overall": {
+    "valid": true,
+    "statistic": 19.727343809669296,
+    "p_value": 0.0005652471240798269,
+    "n_groups": 5,
+    "n_samples": [
+      16,
+      6,
+      6,
+      5,
+      10
+    ],
+    "medians": [
+      99000.0,
+      450000.0,
+      175000.0,
+      158000.0,
+      212500.0
+    ]
+  },
+  "matched_premium": {
+    "valid": true,
+    "n_matched_groups": 6,
+    "n_matched_listings": 16,
+    "by_cluster": [
+      {
+        "cluster": 0,
+        "n_listings": 7,
+        "median_price_ratio": 1.0,
+        "mean_price_ratio": 1.0
+      },
+      {
+        "cluster": 1,
+        "n_listings": 3,
+        "median_price_ratio": 0.5538461538461539,
+        "mean_price_ratio": 1.0
+      },
+      {
+        "cluster": 7,
+        "n_listings": 2,
+        "median_price_ratio": 1.0,
+        "mean_price_ratio": 1.0
+      },
+      {
+        "cluster": 8,
+        "n_listings": 4,
+        "median_price_ratio": 1.0526315789473684,
+        "mean_price_ratio": 1.0
+      }
+    ]
+  },
+  "n_listings_in_analysis": 525,
+  "_saved_at": "2026-04-28T12:10:58.511358"
+}
