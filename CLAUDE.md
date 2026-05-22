@@ -4,74 +4,107 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Academic research crawler for fruitsfamily.com (Korean vintage fashion marketplace). The crawler collects listing/seller/review data into a SQLite DB, which is then analyzed to validate three hypotheses about seller "signature" patterns and pricing.
+Academic research crawler targeting [fruitsfamily.com](https://fruitsfamily.com), a Korean vintage C2C fashion platform. Data is used to empirically test hypotheses about seller style "signatures" and their effect on pricing. The project collects listings, seller metadata, and reviews into a SQLite DB, then exports parquet caches for analysis.
 
-## Setup
-
-```bash
-pip install requests beautifulsoup4 lxml
-# For analysis only:
-pip install pandas numpy scipy scikit-learn matplotlib xgboost pyarrow hdbscan scikit-posthocs
-```
-
-**Before first run:** Edit `src/config.py`:
-1. Fill in `USER_AGENT` with a contact email
-2. Replace `ANONYMIZATION_SALT` with a secret string (used for SHA256 username hashing)
-
-## Commands
+## Environment Setup
 
 ```bash
-# Crawler (run from project root)
-python -m src.main init                    # Initialize DB schema
-python -m src.main seed                    # Discover listing IDs from category/brand pages
-python -m src.main listings --limit 20     # Crawl listing detail pages (start small to verify parsers)
-python -m src.main sellers --limit 50      # Crawl seller detail pages
-python -m src.main reviews --limit 50      # Crawl seller review pages
-python -m src.main stats                   # Show crawl progress counts
+# Python 3.11 via .conda (already created)
+conda activate ./.conda
+pip install -r requirements.txt
 
-# Analysis (requires data in DB first)
-python -m analysis.data_loader             # Check data availability / preview
-python -m analysis.features               # Preview engineered features
-python -m analysis.h1_clustering          # Run clustering (must run before H2/H3)
-python -m analysis.h2_anova               # Price premium by cluster (needs H1 output)
-python -m analysis.h3_prediction          # Price prediction comparison (needs H1 output)
-python -m analysis.run_all                # Full pipeline
+# If using Jupyter:
+python -m ipykernel install --user --name ada --display-name "ada (Python 3.11)"
 ```
 
-To reset and re-crawl from scratch: delete `data/fruitsfamily.db`, then `python -m src.main init`.
+On macOS, XGBoost requires OpenMP: `brew install libomp` before `pip install`.
 
-Logs go to `logs/crawler.log` (also mirrored to stdout).
+## Common Commands
+
+```bash
+# Check crawl progress
+python -m src.main stats
+
+# Recommended crawl workflow (run each step, verify before next)
+python -m src.main seed                        # discover listing IDs from categories + brands
+python -m src.main listings --limit 100        # small batch first to validate parser
+python -m src.main listings --limit 5000       # full run
+python -m src.main sellers --limit 500
+python -m src.main reviews --limit 200 --min-sales 5
+python -m src.main wishlists --limit 1100      # seller public wishlists (1 page = ~40 items each)
+
+# Backfill Apollo fields (condition/like_count/view_count) without re-fetching
+python -m src.reparse --limit 5000
+
+# Fill Apollo fields via HTTP for listings that lack them
+python -m src.main fill --limit 30000
+
+# Backfill view_count from cached seller pages (no HTTP, works offline)
+python -m src.backfill_view_count
+
+# Seed new product_ids discovered in wishlists into listing table (no HTTP)
+# Run before launching a large remote crawl (Oracle Cloud etc.) to expand the universe.
+python -m src.seed_from_wishlist
+```
 
 ## Architecture
 
-### Crawler (`src/`)
+### Crawl Pipeline (4 stages)
 
-**4-stage pipeline** — each stage is independently resumable via `crawl_state` table:
+```
+seed_categories → crawl_listings → crawl_sellers → crawl_reviews
+```
 
-1. **`seed_categories`** — hits category search pages + brand pages to discover `product_id`s, inserts placeholder rows with `seller_id='_pending_'`
-2. **`crawl_listings`** — fetches product detail pages for `_pending_` rows, fills in all fields via `upsert_listing`
-3. **`crawl_sellers`** — for sellers discovered in listings but not yet fetched, gets seller metadata + additional listing cards
-4. **`crawl_reviews`** — only for sellers with `total_sales >= min_sales`, fetches review pages
+Each stage is independently resumable — it queries the DB for unprocessed records and picks up where it left off. No in-memory state; every record is committed immediately after fetch.
 
-**Key design invariants:**
-- `Fetcher` handles all HTTP: rate limiting (2–4s random delay), retry (3x with exponential backoff), 4xx = immediate abort, and raw HTML saved to `data/raw_html/` by URL hash for re-parsing without re-fetching
-- `parsers.py` uses structural heuristics (URL patterns, relative position to `<h1>`, text proximity) — NOT CSS class names, which are auto-generated and unstable in the React SSR output. Parsers never raise exceptions; missing fields return `None`.
-- `db.upsert_listing` uses `COALESCE` to never overwrite real values with `NULL`, and specifically handles the `_pending_` → real `seller_id` transition
-- `crawl_state` table keys like `"category:MEN:26:done"` allow skipping already-processed seeds on resume
+**Stage 1 — Seed** (`crawler.py:seed_categories`): Scrapes category search pages + brand pages to collect `product_id` seeds. Inserts rows with `seller_id='_pending_'` as placeholders.
 
-### Analysis (`analysis/`)
+**Stage 2 — Listings** (`crawler.py:crawl_listings`): Fetches each `_pending_` product detail page. Parses price, brand, size, sold status, and seller ID. Upserts over the placeholder row.
 
-**Data flow:** `fruitsfamily.db` → `data_loader` (DataFrames + parquet cache) → `features` (engineered variables: `signature_text`, `consistency`, `matched_pairs`) → H1 clustering → H2/H3 statistical tests → `results/*.json` + `results/figures/*.png`
+**Stage 3 — Sellers** (`crawler.py:crawl_sellers`): Fetches seller profile pages for any seller ID found in listings but not yet detailed in the `seller` table. Also ingests additional listing cards found on seller pages (without Apollo fields — those need `fill`).
 
-**Three hypotheses:**
-- **H1** (`h1_clustering.py`): Seller signature clusters exist — TF-IDF on listing text + K-means
-- **H2** (`h2_anova.py`): Signature clusters correlate with pricing — Kruskal-Wallis + matched-pair analysis
-- **H3** (`h3_prediction.py`): Signature features improve price prediction — XGBoost model A vs B, paired t-test on RMSE
+**Stage 4 — Reviews** (`crawler.py:crawl_reviews`): Fetches review pages for sellers with `total_sales >= min_sales`.
 
-H2 and H3 depend on `seller_clusters.parquet` output from H1.
+**Stage 5 — Wishlists** (`crawler.py:crawl_wishlists`): Fetches `/seller/{sid}/x/like` for each seller. Extracts public wishlist (max 40 items per first page). The wished products are usually from *other* sellers — stored as `(owner_seller_id, product_id, rank)` triples in the `wishlist` table. Uses `crawl_state` key `wishlist:{seller_id}:done` for resumability; empty wishlists are still marked done.
 
-**Minimum data for analysis:** 50+ sellers with 3+ listings (H1), 500+ listings (H2), 1,000+ listings (H3).
+### Parser Architecture (`parsers.py`)
 
-### DB Schema
+Fruitsfamily is a React SPA with SSR. Each page has two data sources parsed in priority order:
 
-Five tables: `seller`, `listing`, `review`, `crawl_state`, `fetch_failure`. Full column definitions in `src/db.py` `SCHEMA` constant. `seller.username_hash` is a salted SHA256 of the raw username — the salt is only in `config.ANONYMIZATION_SALT`.
+1. **`__APOLLO_STATE__`** JSON (script tag `id="__APOLLO_STATE__"`) — structured GraphQL cache; most reliable. Contains `condition`, `like_count`, `view_count`, `createdAt`, etc.
+2. **Text heuristics** (BeautifulSoup) — fallback when Apollo state is missing a field.
+
+Key subtlety: Apollo state uses **numeric IDs** (`ProductNotMine:8867516`) as keys, but the URL uses **shortcodes** (`/product/5a27w/`). `_apollo_product()` resolves this via `ROOT_QUERY.seeProductResponse.__ref`. Seller IDs are always taken from the HTML `/seller/` link (not Apollo) to stay consistent with the shortcode-based DB schema.
+
+### Database (`db.py`)
+
+SQLite at `data/fruitsfamily.db`. Tables: `seller`, `listing`, `review`, `wishlist` (seller's public liked items, with rank), `crawl_state` (checkpoint key-value store), `fetch_failure`.
+
+**Apollo numeric ↔ shortcode mapping**: Apollo state uses numeric product IDs (`ProductNotMine:8867516`), but DB stores URL shortcodes (`5a27w`). For *list contexts* (seller pages, wishlist pages), the order of `ROOT_QUERY.searchProducts(...)` / `seeUserLikes(...)` matches the order of `<a href="/product/{shortcode}">` cards in the HTML — pair them by index, skipping when lengths disagree. This is how `backfill_view_count.py` and `parse_wishlist_page` resolve shortcodes.
+
+**`view_count` quirk**: Product page Apollo SSR includes `view_count` inconsistently (~20% of pages). Seller page Apollo SSR includes `view_count` for **every** product in the seller's listing. Therefore `view_count` is reliably backfilled via cached seller HTML (`src/backfill_view_count.py`), not via product page reparse.
+
+`upsert_listing` has explicit COALESCE logic so NULL values from card-level scrapes never overwrite real data from detailed product pages. The `condition` column (NEW/GOOD_CONDITION/LIGHTLY_WORN/WORN) and `like_count`/`view_count`/`created_at`/`gender` are Apollo-only fields added via migration in `_migrate()`.
+
+`crawl_state` stores per-category/brand "done" flags (e.g., `category:MEN:26:done = "1"`) so re-running `seed` skips already-processed sources.
+
+### Data Flow for Analysis
+
+Raw HTML is saved to `data/raw_html/` (keyed by SHA256 of URL). If the parser is updated, run `python -m src.reparse` to re-extract fields from cached HTML without hitting the network.
+
+Parquet caches at `data/cache/` are produced separately for analysis notebooks (listings, sellers, reviews, seller_clusters).
+
+## Key Configuration (`config.py`)
+
+All crawl limits, URL patterns, seed categories/brands, and rate limit parameters are centralized here. Change `SEARCH_SORT`, `SEED_CATEGORIES`, or `SEED_BRANDS` to adjust scope. `ANONYMIZATION_SALT` should be rotated before a real run — seller usernames are SHA256-hashed with this salt before DB storage.
+
+Rate limiting: 2–4 second random delay between requests, exponential backoff on 5xx, immediate give-up on 4xx.
+
+## Research Context
+
+Three hypotheses being tested (relevant for understanding what fields matter):
+- **H1**: Sellers form distinct style clusters via TF-IDF on brand names + listing titles (HDBSCAN)
+- **H2**: Cluster membership and brand consistency correlate with pricing and sold rate (Kruskal-Wallis, Spearman, matched-pair analysis)
+- **H3**: Adding seller signature features to XGBoost price prediction improves R² vs. product-only features
+
+The `report_generator.py` module generates academic DOCX reports from analysis results using `python-docx`.

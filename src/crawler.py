@@ -295,6 +295,69 @@ class Crawler:
         logger.info(f"[FILL 완료] {success} 성공 / {fail} 실패")
 
     # ============================================================
+    # 5단계: 위시리스트 (셀러가 공개 찜한 매물)
+    # ============================================================
+    def crawl_wishlists(self, conn, limit: int = 1000):
+        """각 셀러의 공개 위시리스트 첫 페이지(최대 40건)를 수집.
+
+        - 매핑 실패/빈 위시리스트는 done 표시만 하고 넘어감 (재요청 방지).
+        - product_id는 다른 셀러의 매물일 수 있음 — listing 테이블엔 안 넣고
+          wishlist 테이블에 페어만 저장 (필요시 후속 단계에서 발견된 신규
+          product_id를 listing 시드로 끌어올 수 있음).
+        """
+        # crawl_state로 이미 처리한 셀러 제외
+        rows = conn.execute(
+            """SELECT s.seller_id FROM seller s
+               LEFT JOIN crawl_state cs ON cs.key = 'wishlist:' || s.seller_id || ':done'
+               WHERE cs.value IS NULL
+               LIMIT ?""",
+            (limit,),
+        ).fetchall()
+
+        logger.info(f"[WISHLISTS] {len(rows)}명 셀러 위시리스트 크롤링 시작")
+        success = fail = empty = 0
+
+        for row in rows:
+            sid = row["seller_id"]
+            url = f"{config.BASE_URL}/seller/{sid}/x/like"
+            html = self.fetcher.get(url)
+            if not html:
+                db.log_failure(conn, url, err="wishlist fetch failed")
+                conn.commit()
+                fail += 1
+                continue
+
+            try:
+                items = parsers.parse_wishlist_page(html, sid)
+            except Exception as e:
+                logger.exception(f"위시 파싱 예외 {sid}: {e}")
+                db.log_failure(conn, url, err=f"wishlist parse: {type(e).__name__}: {e}")
+                conn.commit()
+                fail += 1
+                continue
+
+            if not items:
+                # 빈 위시리스트 또는 매핑 실패 — done 표시 후 다음으로
+                empty += 1
+            else:
+                for it in items:
+                    conn.execute(
+                        """INSERT OR IGNORE INTO wishlist
+                           (owner_seller_id, product_id, rank, crawled_at)
+                           VALUES (?, ?, ?, ?)""",
+                        (it["owner_seller_id"], it["product_id"], it["rank"], db.now()),
+                    )
+                success += 1
+
+            db.set_state(conn, f"wishlist:{sid}:done", "1")
+            conn.commit()
+
+            if (success + empty + fail) % 25 == 0:
+                logger.info(f"  진행: {success} 항목수집 / {empty} 빈위시/실패매핑 / {fail} 요청실패")
+
+        logger.info(f"[WISHLISTS 완료] {success} 항목수집 / {empty} 빈위시/실패매핑 / {fail} 요청실패")
+
+    # ============================================================
     # 4단계: 리뷰
     # ============================================================
     def crawl_reviews(self, conn, min_sales: int = 5, limit: int = 200):

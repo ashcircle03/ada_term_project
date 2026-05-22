@@ -63,6 +63,19 @@ CREATE TABLE IF NOT EXISTS review (
     FOREIGN KEY (seller_id) REFERENCES seller(seller_id)
 );
 
+-- 셀러의 공개 위시리스트 (찜한 매물)
+-- owner_seller_id = 찜한 사람, product_id = 찜한 매물 shortcode
+CREATE TABLE IF NOT EXISTS wishlist (
+    owner_seller_id TEXT NOT NULL,
+    product_id TEXT NOT NULL,
+    rank INTEGER NOT NULL,
+    crawled_at TEXT NOT NULL,
+    PRIMARY KEY (owner_seller_id, product_id),
+    FOREIGN KEY (owner_seller_id) REFERENCES seller(seller_id)
+);
+CREATE INDEX IF NOT EXISTS idx_wishlist_owner ON wishlist(owner_seller_id);
+CREATE INDEX IF NOT EXISTS idx_wishlist_product ON wishlist(product_id);
+
 -- 크롤링 상태 추적 — 재개용
 -- key 예: 'category:MEN:26:page', 'seller:nni4:done'
 CREATE TABLE IF NOT EXISTS crawl_state (
@@ -291,6 +304,8 @@ def stats(conn) -> dict:
         "n_listings": conn.execute("SELECT COUNT(*) FROM listing").fetchone()[0],
         "n_sold": conn.execute("SELECT COUNT(*) FROM listing WHERE is_sold = 1").fetchone()[0],
         "n_reviews": conn.execute("SELECT COUNT(*) FROM review").fetchone()[0],
+        "n_wishlists": conn.execute("SELECT COUNT(*) FROM wishlist").fetchone()[0],
+        "n_wishlist_owners": conn.execute("SELECT COUNT(DISTINCT owner_seller_id) FROM wishlist").fetchone()[0],
         "n_failures": conn.execute("SELECT COUNT(*) FROM fetch_failure").fetchone()[0],
     }
 

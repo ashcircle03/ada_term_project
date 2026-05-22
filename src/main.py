@@ -6,6 +6,7 @@
   python -m src.main listings      # 매물 상세 크롤링
   python -m src.main sellers       # 셀러 메타 크롤링
   python -m src.main reviews       # 리뷰 크롤링
+  python -m src.main wishlists     # 셀러 공개 위시리스트 크롤링
   python -m src.main fill          # condition/like_count/view_count 채우기 (Apollo 재크롤)
   python -m src.main stats         # 진행 상황 조회
   python -m src.main full          # seed → listings → sellers 일괄 실행
@@ -65,6 +66,12 @@ def cmd_reviews(args):
         crawler.crawl_reviews(conn, min_sales=args.min_sales, limit=args.limit)
 
 
+def cmd_wishlists(args):
+    crawler = Crawler()
+    with db.get_conn() as conn:
+        crawler.crawl_wishlists(conn, limit=args.limit)
+
+
 def cmd_fill(args):
     """condition/like_count/view_count 없는 매물 상세 페이지 재크롤링."""
     crawler = Crawler()
@@ -113,6 +120,9 @@ def main():
     sp.add_argument("--limit", type=int, default=50)
     sp.add_argument("--min-sales", type=int, default=5, dest="min_sales")
 
+    sp = sub.add_parser("wishlists")
+    sp.add_argument("--limit", type=int, default=1100)
+
     sp = sub.add_parser("fill")
     sp.add_argument("--limit", type=int, default=30000)
 
@@ -123,8 +133,8 @@ def main():
 
     handlers = {
         "init": cmd_init, "seed": cmd_seed, "listings": cmd_listings,
-        "sellers": cmd_sellers, "reviews": cmd_reviews, "fill": cmd_fill,
-        "stats": cmd_stats, "full": cmd_full,
+        "sellers": cmd_sellers, "reviews": cmd_reviews, "wishlists": cmd_wishlists,
+        "fill": cmd_fill, "stats": cmd_stats, "full": cmd_full,
     }
     handlers[args.cmd](args)
 

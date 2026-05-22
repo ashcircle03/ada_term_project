@@ -153,6 +153,16 @@ def parse_product_page(html: str, url: str) -> dict | None:
     # ── Apollo state 파싱 ─────────────────────────────────────
     apollo = _extract_apollo(soup)
     ap = _apollo_product(apollo, data["product_id"])
+    # ROOT_QUERY 경유 ap는 view_count가 없는 partial 객체일 수 있음.
+    # ap의 numeric id로 ProductNotMine/ProductMine 전체 객체를 재조회.
+    _numeric_id = ap.get("id")
+    if _numeric_id:
+        _full_ap = (
+            apollo.get(f"ProductNotMine:{_numeric_id}")
+            or apollo.get(f"ProductMine:{_numeric_id}")
+        )
+        if _full_ap and _full_ap.get("view_count") is not None:
+            ap = _full_ap
 
     # 2. 제목
     data["title"] = ap.get("title") or None
@@ -467,6 +477,54 @@ def parse_search_page(html: str) -> list[str]:
             seen.add(m.group(1))
             ids.append(m.group(1))
     return ids
+
+
+# ============================================================
+# 위시리스트 페이지 파서 (셀러가 공개 찜한 매물 목록)
+# ============================================================
+
+def parse_wishlist_page(html: str, owner_seller_id: str) -> list[dict]:
+    """위시리스트 페이지 → [{product_id, rank}].
+
+    매핑: ROOT_QUERY.seeUserLikes 리스트 ↔ HTML /product/ 카드 순서 1:1.
+    길이 불일치면 안전을 위해 빈 리스트 반환.
+    """
+    if not html:
+        return []
+    soup = BeautifulSoup(html, "lxml")
+    apollo = _extract_apollo(soup)
+
+    # 1. seeUserLikes (Apollo 순서)
+    refs: list[str] = []
+    for k, v in apollo.get("ROOT_QUERY", {}).items():
+        if k.startswith("seeUserLikes") and isinstance(v, list):
+            refs = [item.get("__ref") for item in v if isinstance(item, dict) and item.get("__ref")]
+            break
+
+    # 2. HTML 카드 shortcode 순서 (dedup)
+    shortcodes: list[str] = []
+    seen: set[str] = set()
+    for a in soup.find_all("a", href=PRODUCT_URL_RE):
+        m = PRODUCT_URL_RE.search(a.get("href", ""))
+        if m and m.group(1) not in seen:
+            seen.add(m.group(1))
+            shortcodes.append(m.group(1))
+
+    # 3. Apollo 리스트가 비어있으면 위시리스트가 빈 것 (정상) → [] 반환
+    if not refs:
+        return []
+
+    # 4. 길이 불일치 → 매핑 신뢰 불가 → 빈 리스트 (실패 표시는 호출자가)
+    if len(refs) != len(shortcodes):
+        logger.warning(
+            f"위시 매핑 길이 불일치 owner={owner_seller_id}: refs={len(refs)} cards={len(shortcodes)}"
+        )
+        return []
+
+    return [
+        {"owner_seller_id": owner_seller_id, "product_id": sc, "rank": i}
+        for i, sc in enumerate(shortcodes)
+    ]
 
 
 # ============================================================
