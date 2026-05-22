@@ -1,30 +1,30 @@
 {
   "data": {
-    "n_listings": 26272,
+    "n_listings": 26109,
     "n_sellers_discovered": 1047,
-    "n_sellers_meta": 1047,
-    "n_active_sellers_5plus": 888,
-    "sold_rate": 0.4249010353227771,
-    "price_median": 120000.0
+    "n_sellers_meta": 1048,
+    "n_active_sellers_5plus": 887,
+    "sold_rate": 0.18706193266689647,
+    "price_median": 150000.0
   },
   "h1": {
-    "n_sellers": 888,
+    "n_sellers": 887,
     "best_k": 12,
-    "best_silhouette": 0.2081367070495577
+    "best_silhouette": 0.07033999069293624
   },
   "h2": {
-    "kruskal_p": 1.5189576264443948e-09,
-    "n_matched_groups": 133,
-    "consistency_sold_rho": 0.12503842175999166,
-    "consistency_sold_p": 0.00010786154261092965
+    "kruskal_p": 0.0,
+    "n_matched_groups": 3134,
+    "consistency_sold_rho": -0.12403219082561652,
+    "consistency_sold_p": 0.00012163681936353183
   },
   "h3": {
-    "baseline_ridge_r2": 0.12273330962258751,
-    "model_a_r2": 0.17516222693629074,
-    "model_b_r2": 0.270725225672843,
-    "r2_delta": 0.09556299873655227,
-    "rmse_drop_pct": 7.186151760420308,
-    "paired_t_p": 0.05080636215000186
+    "baseline_ridge_r2": 0.4940304381997658,
+    "model_a_r2": 0.431980736272387,
+    "model_b_r2": 0.5252169793013353,
+    "r2_delta": 0.09323624302894828,
+    "rmse_drop_pct": 2.773797415270766,
+    "paired_t_p": 0.0005941346071153076
   },
-  "_saved_at": "2026-05-13T14:54:18.669496"
+  "_saved_at": "2026-05-15T14:09:54.020314"
 }

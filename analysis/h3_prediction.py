@@ -45,8 +45,11 @@ def prepare_features(df: pd.DataFrame, with_signature: bool) -> tuple:
         "discount_pct", "title_len", "desc_len", "has_size",
         "has_discount", "n_photos",
     ]
-    # one-hot: brand, category_l1, category_l2, size
-    cat_cols = ["brand", "category_l1", "category_l2", "size"]
+    # condition 더미 (매물 등록 시 셀러가 직접 선택 → 가격 결정 요인)
+    if "condition" in df.columns:
+        cat_cols = ["brand", "category_l1", "category_l2", "size", "condition"]
+    else:
+        cat_cols = ["brand", "category_l1", "category_l2", "size"]
 
     base_df = df[common_cols].copy()
     cat_dummies = pd.get_dummies(df[cat_cols].astype(str), drop_first=False)
@@ -70,6 +73,7 @@ def prepare_features(df: pd.DataFrame, with_signature: bool) -> tuple:
             "followers", "total_sales", "rating",  # 셀러 메타
             "seller_n_listings", "seller_sold_rate",  # 셀러 활동량
             "seller_median_likes", "seller_avg_n_photos",  # 매물 품질 시그널
+            "seller_avg_like_count", "seller_avg_view_count",  # 셀러 평균 참여도
         ]
         for col in safe_seller_cols:
             if col in df.columns and col not in leakage_cols:
@@ -83,8 +87,13 @@ def prepare_features(df: pd.DataFrame, with_signature: bool) -> tuple:
     return X, y, list(X.columns)
 
 
-def cv_evaluate(X: pd.DataFrame, y: pd.Series, n_splits: int = 5) -> dict:
-    """XGBoost 회귀 + 5-fold CV. fold별 RMSE/MAE/R² 반환."""
+def cv_evaluate(X: pd.DataFrame, y: pd.Series, n_splits: int = 10) -> dict:
+    """XGBoost 회귀 + 10-fold CV. fold별 RMSE/MAE/R² 반환.
+
+    5-fold에서 10-fold로 변경한 이유: 표본이 26,000+으로 충분하고,
+    paired t-test가 fold 수에 민감 (5-fold는 자유도 4로 검정력 매우 낮음).
+    10-fold는 자유도 9로 실질적 개선이 있을 때 탐지 가능.
+    """
     try:
         from xgboost import XGBRegressor
     except ImportError:
@@ -171,21 +180,25 @@ def run(min_listings: int = 100) -> dict:
 
     if clusters is not None:
         df = df.merge(clusters, on="seller_id", how="left")
+        # H1 분석 제외 셀러(brand unreliable, 매물 5 미만)는 cluster=NULL → -1(잡화형)로 처리
+        df["cluster"] = df["cluster"].fillna(-1).astype(int)
     df = df.merge(cons, on="seller_id", how="left")
     df = df.merge(
         aggs.add_prefix("seller_").rename(columns={"seller_seller_id": "seller_id"}),
         on="seller_id", how="left",
     )
 
-    # 가격 결측 매물 제외
+    # 가격 결측·0원 매물 제외
     df = df.dropna(subset=["price_final"])
     df = df[df["price_final"] > 0]
 
     # 매물 단위 파생 변수
     df = listing_features(df)
 
-    utils.bullet("분석 대상 매물", f"{len(df)}건")
+    n_specialist = int((df["cluster"] != -1).sum()) if "cluster" in df.columns else 0
+    utils.bullet("분석 대상 매물", f"{len(df):,}건")
     utils.bullet("가격 중앙값", f"{df['price_final'].median():,.0f}원")
+    utils.bullet("전문형 매물 비중", f"{n_specialist:,}건 ({n_specialist/len(df):.1%})")
 
     # ---------------------------------------------------------
     # Model A vs B
@@ -209,7 +222,7 @@ def run(min_listings: int = 100) -> dict:
     # ---------------------------------------------------------
     # 차이 검정
     # ---------------------------------------------------------
-    utils.section("Model A vs B 차이 — paired t-test")
+    utils.section("Model A vs B 차이 — paired t-test (10-fold)")
     rmse_test = paired_test(res_a["fold_rmse"], res_b["fold_rmse"], alternative="greater")
     r2_test = paired_test(res_b["fold_r2"], res_a["fold_r2"], alternative="greater")
 
@@ -223,16 +236,28 @@ def run(min_listings: int = 100) -> dict:
     rmse_drop_pct = (res_a["rmse_mean"] - res_b["rmse_mean"]) / res_a["rmse_mean"] * 100
     utils.bullet("RMSE 개선율", f"{rmse_drop_pct:+.2f}%")
 
+    # Model B feature importance 상위 시그니처 피처
+    _, _, feat_names_b = prepare_features(df, with_signature=True)
+    fi = res_b["feature_importance"]
+    top_fi = sorted(zip(feat_names_b, fi), key=lambda x: x[1], reverse=True)[:15]
+    utils.section("Model B — 상위 15 피처 (평균 feature importance)")
+    for name, imp in top_fi:
+        bar = "█" * int(imp * 300)
+        utils.bullet(name[:35], f"{imp:.4f} {bar}")
+
     # ---------------------------------------------------------
     # 결과 저장
     # ---------------------------------------------------------
     payload = {
         "n_listings": len(df),
+        "n_specialist": n_specialist,
+        "n_folds": 10,
         "model_a": {k: v for k, v in res_a.items() if k != "feature_importance"},
         "model_b": {k: v for k, v in res_b.items() if k != "feature_importance"},
         "rmse_test": rmse_test,
         "r2_test": r2_test,
         "rmse_drop_pct": rmse_drop_pct,
+        "top_features_b": [{"feature": n, "importance": float(i)} for n, i in top_fi],
     }
     utils.save_result("h3_prediction", payload)
     return payload

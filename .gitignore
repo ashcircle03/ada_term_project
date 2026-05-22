@@ -4,6 +4,8 @@ __pycache__/
 *.pyc
 .DS_Store
 
+*.key
+
 # 크롤링 raw HTML (336MB, 너무 큼)
 data/raw_html/
 

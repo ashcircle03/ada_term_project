@@ -1,22 +1,33 @@
-"""가설 1: 셀러는 매물 텍스트·브랜드 분포에 따라 의미 있는 N개의 스타일 시그니처로 분리된다.
+"""가설 1: 셀러 집단에서 의미 있는 스타일 시그니처 그룹이 존재한다.
+단, 모든 셀러가 시그니처를 갖지는 않는다 — 특정 스타일에 집중하는 '전문형' 셀러와
+여러 브랜드를 혼합하는 '잡화형' 셀러가 공존할 것이다.
 
 방법:
-  1. 셀러별 signature_text를 TF-IDF 벡터화
-  2. K-means + HDBSCAN 비교
-  3. 실루엣 계수로 K 결정
+  1. 셀러별 signature_text를 TF-IDF 벡터화 (desc_weight=0 — 본문 보일러플레이트 제거)
+  2. TruncatedSVD(100차원)로 고차원 스파스 행렬 축소
+  3. HDBSCAN — K 지정 없이 밀도 기반 군집 발견, noise(-1)로 시그니처 없는 셀러 처리
   4. 각 클러스터의 대표 키워드·브랜드 추출 → 시그니처 라벨 부여
 
+설계 근거:
+  - K-means: 모든 셀러를 반드시 군집에 배정 → 시그니처 없는 셀러가 쓰레기 클러스터 형성
+    (실루엣 0.063, k=19에서도 수렴 없음 — 자연적 군집 구조 부재 의미)
+  - consistency 필터: brand 엔트로피 기반으로 다중 브랜드 스타일 셀러를 잘못 제외
+    (예: Rick Owens+Chrome Hearts+Yohji = 명확한 아방가르드 시그니처지만 consistency=0.063)
+  - HDBSCAN+SVD: 자연적 고밀도 영역만 클러스터로 지정, 나머지는 noise(-1) = '잡화형'
+
 출력:
-  results/h1_clustering.json — k, silhouette, 클러스터별 키워드/대표브랜드/셀러수
-  results/figures/h1_*.png  — 클러스터 시각화 (PCA 2D)
-  data/cache/seller_clusters.parquet — 셀러별 클러스터 라벨 (H2·H3에서 사용)
+  results/h1_clustering.json — 클러스터별 키워드/대표브랜드/셀러수, 잡화형 셀러 수
+  results/figures/h1_*.png  — 클러스터 시각화 (SVD 2D)
+  data/cache/seller_clusters.parquet — 셀러별 클러스터 라벨 (-1=잡화형, H2·H3에서 사용)
 """
 import re
+import sqlite3
 from collections import Counter
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from sklearn.decomposition import TruncatedSVD
 
 from analysis import utils
 from analysis.data_loader import load_listings, CACHE_DIR
@@ -62,6 +73,17 @@ STOPWORDS = {
     "너무", "가로", "세로", "총장", "어깨", "기장", "암홀", "허리",  # 측정 어휘
 
     # ============================================================
+    # 범용 의류 카테고리 어휘 — 모든 셀러가 사용해 시그니처 차이 미생성
+    # (top feature 분석에서 확인: 클러스터 분리에 기여하지 않음)
+    # ============================================================
+    "티셔츠", "팬츠", "자켓", "후드티", "후드", "맨투맨", "셔츠", "코트",
+    "바지", "청바지", "데님", "원피스", "스커트", "니트", "가디건", "점퍼",
+    "집업", "스웨터", "블라우스", "슬랙스", "조거", "레깅스", "트레이닝",
+    "가슴", "어깨너비", "밑단", "소매", "허리단", "힙", "밑위",  # 치수 어휘 보강
+    "jacket", "shirt", "pants", "hoodie", "coat", "dress", "skirt",
+    "sweater", "cardigan", "tshirt", "denim", "jeans", "top", "bottom",
+
+    # ============================================================
     # 보편 색상 — 모든 매물에 등장해 시그니처 차이를 못 만듦
     # ============================================================
     "블랙", "화이트", "네이비", "그레이", "그린", "레드", "블루",
@@ -85,66 +107,150 @@ STOPWORDS = {
 }
 
 KOREAN_RE = re.compile(r"[가-힣]+")
-ENGLISH_RE = re.compile(r"[A-Za-z]{2,}")
-
-# 한국어 어미·조사 — 토큰 끝에서 제거 (단순 휴리스틱, KoNLPy 대안)
-KOREAN_ENDINGS = (
-    "하며", "하면", "하고", "해서", "이라", "이며", "이고",
-    "입니다", "이에요", "예요", "이다", "이며", "이라는",
-    "됩니다", "되어", "되며", "됐다", "됐어요",
-    "습니다", "어요", "아요",
-    "에서", "으로", "에게", "까지", "에서는", "으로는",
-    "들이", "들은", "들에",
-    "이라서", "라서", "에서도",
-)
 
 
-def _trim_ending(token: str) -> str:
-    """한국어 토큰의 흔한 어미·조사를 끝에서 제거.
-    e.g., '배송하며' → '배송', '시작됩니다' → '시작', '측에서' → '측'
-    너무 짧은 결과(1자)는 빈 문자열로 (단일 음절은 의미 없음).
+def _load_brand_dict() -> dict[str, str]:
+    """DB에서 공백 포함 브랜드명을 로드해 치환 사전 생성.
+
+    'Stone Island' → 'Stone_Island' 형태로 보호.
+    공백 없는 브랜드는 Kiwi가 자연스럽게 처리하므로 제외.
+    긴 브랜드명 먼저 치환해야 부분 치환 오류 방지.
     """
-    for ending in KOREAN_ENDINGS:
-        if token.endswith(ending) and len(token) > len(ending) + 1:
-            return token[: -len(ending)]
-    return token
+    db_path = Path(__file__).parent.parent / "data" / "fruitsfamily.db"
+    if not db_path.exists():
+        return {}
+    conn = sqlite3.connect(db_path)
+    brands = pd.read_sql(
+        "SELECT DISTINCT brand FROM listing WHERE brand IS NOT NULL", conn
+    )["brand"].tolist()
+    conn.close()
+
+    mapping = {}
+    for b in brands:
+        key = b.strip()
+        if len(key) < 3:
+            continue
+        # 공백 포함 브랜드 (Stone Island → Stone_Island)
+        if " " in key:
+            mapping[key] = key.replace(" ", "_")
+        # . 포함 브랜드 (A.Presse → A_Presse)
+        elif "." in key:
+            mapping[key] = key.replace(".", "_")
+    # 긴 브랜드명 먼저 치환 (부분 치환 방지)
+    return dict(sorted(mapping.items(), key=lambda x: -len(x[0])))
+
+
+# 모듈 로드 시 1회 초기화
+_BRAND_DICT: dict[str, str] = _load_brand_dict()
+# 역변환: 'Stone_Island' → 'stone island' (소문자 정규화)
+_BRAND_DICT_INV: dict[str, str] = {
+    v.lower(): k.lower().replace(" ", "_") for k, v in _BRAND_DICT.items()
+}
+
+
+def _protect_brands(text: str) -> str:
+    """브랜드명 공백을 _ 로 치환해 Kiwi 분리 방지."""
+    for brand, protected in _BRAND_DICT.items():
+        text = text.replace(brand, protected)
+    return text
 
 
 def korean_tokenizer(text: str) -> list[str]:
-    """한국어 명사·영문 단어를 단순 추출.
+    """Kiwi 형태소 분석 기반 한국어 명사 + 영문 고유명사 추출.
 
-    KoNLPy 형태소 분석기 없이도 동작 — 의존성 최소화.
-    빈티지 패션 키워드는 명사·고유명사·브랜드명이 많아서 단순 추출도 효과적.
-    어미·조사를 단순 트리밍하여 명사 형태에 가깝게 정규화.
+    브랜드명 보호 흐름:
+      1. 공백 포함 브랜드명을 _ 연결형으로 치환 (Stone Island → Stone_Island)
+      2. Kiwi로 토큰화 — SL 토큰이 _ 기호 사이에 분리되므로
+      3. 연속 SL + SW(_) + SL 패턴을 다시 합쳐 브랜드 토큰 복원
+      4. NNG/NNP/SL 태그 명사만 남기고 스탑워드·2자 미만 제거
     """
     if not text:
         return []
+
+    try:
+        _get_kiwi()
+    except ImportError:
+        return _regex_tokenizer(text)
+
+    protected = _protect_brands(text)
+    raw_tokens = _get_kiwi().tokenize(protected)
+
+    # SL + SW(_) + SL 연속 패턴 합치기 (브랜드명 복원)
+    merged = []
+    i = 0
+    while i < len(raw_tokens):
+        t = raw_tokens[i]
+        # 영문 토큰 뒤에 _ 기호가 오면 다음 영문과 합침
+        if (
+            t.tag == "SL"
+            and i + 2 < len(raw_tokens)
+            and raw_tokens[i + 1].form == "_"
+            and raw_tokens[i + 2].tag == "SL"
+        ):
+            combined = t.form + "_" + raw_tokens[i + 2].form
+            # 추가로 이어지는 _+SL 패턴도 합침 (3단어 이상 브랜드)
+            j = i + 3
+            while j + 1 < len(raw_tokens) and raw_tokens[j].form == "_" and raw_tokens[j + 1].tag == "SL":
+                combined += "_" + raw_tokens[j + 1].form
+                j += 2
+            merged.append(combined.lower())
+            i = j
+        elif t.tag in ("NNG", "NNP", "SL"):
+            merged.append(t.form.lower())
+            i += 1
+        else:
+            i += 1
+
+    out = []
+    for form in merged:
+        if len(form) < 2:
+            continue
+        if form in STOPWORDS:
+            continue
+        out.append(form)
+    return out
+
+
+def _regex_tokenizer(text: str) -> list[str]:
+    """kiwipiepy 미설치 환경용 정규식 폴백."""
+    ENGLISH_RE = re.compile(r"[A-Za-z_]{2,}")
     raw = KOREAN_RE.findall(text) + ENGLISH_RE.findall(text)
     out = []
     for t in raw:
         t = t.lower()
-        # 한국어는 어미 트리밍, 영문은 그대로
-        if KOREAN_RE.fullmatch(t):
-            t = _trim_ending(t)
-        if len(t) < 2:
-            continue
-        if t in STOPWORDS:
+        if len(t) < 2 or t in STOPWORDS:
             continue
         out.append(t)
     return out
+
+
+# Kiwi 인스턴스 싱글톤 (초기화 비용 절감)
+_kiwi_instance = None
+
+
+def _get_kiwi():
+    global _kiwi_instance
+    if _kiwi_instance is None:
+        from kiwipiepy import Kiwi
+        _kiwi_instance = Kiwi()
+    return _kiwi_instance
 
 
 # ============================================================
 # 클러스터링
 # ============================================================
 
-def vectorize_sellers(seller_text_df: pd.DataFrame, max_features: int = 1000):
+def vectorize_sellers(seller_text_df: pd.DataFrame, max_features: int = 3000):
     """signature_text → TF-IDF 매트릭스."""
     from sklearn.feature_extraction.text import TfidfVectorizer
+    n = len(seller_text_df)
+    # min_df: 전체 셀러의 1% 이상이 사용한 어휘만 포함
+    # (n=883일 때 min_df≈9 → 브랜드별 소수 매니아 어휘는 제거, 시그니처 공유 어휘만 유지)
+    min_df = max(2, int(n * 0.01))
     vec = TfidfVectorizer(
         tokenizer=korean_tokenizer,
         max_features=max_features,
-        min_df=2,        # 2명 미만 셀러만 쓰는 어휘 제외
+        min_df=min_df,
         max_df=0.8,      # 80% 이상 셀러가 쓰는 흔한 어휘 제외
         token_pattern=None,
     )
@@ -176,15 +282,30 @@ def kmeans_with_optimal_k(X, k_range=range(3, 12)):
     return best["model"], best["labels"], results
 
 
-def hdbscan_clusters(X):
-    """HDBSCAN — K 지정 없이 자연스러운 군집 발견."""
+def hdbscan_clusters(X_svd, min_cluster_size: int = 5):
+    """HDBSCAN on SVD-reduced matrix — K 지정 없이 밀도 기반 군집 발견.
+
+    고차원 TF-IDF에 직접 euclidean 거리를 쓰면 차원의 저주로 거리 구분이 무의미해짐.
+    TruncatedSVD로 100차원 축소 후 적용.
+    noise(-1) = 시그니처 없는 잡화형 셀러.
+    """
     try:
-        import hdbscan
+        import hdbscan as hdbscan_lib
     except ImportError:
         return None, None
-    clusterer = hdbscan.HDBSCAN(min_cluster_size=5, metric="euclidean")
-    labels = clusterer.fit_predict(X.toarray())
+    clusterer = hdbscan_lib.HDBSCAN(min_cluster_size=min_cluster_size, metric="euclidean")
+    labels = clusterer.fit_predict(X_svd)
     return clusterer, labels
+
+
+def reduce_dimensions(X, n_components: int = 100):
+    """TruncatedSVD로 스파스 TF-IDF 행렬을 밀집 저차원 공간으로 축소."""
+    from sklearn.decomposition import TruncatedSVD
+    n_comp = min(n_components, X.shape[1] - 1, X.shape[0] - 1)
+    svd = TruncatedSVD(n_components=n_comp, random_state=42)
+    X_svd = svd.fit_transform(X)
+    explained = svd.explained_variance_ratio_.sum()
+    return X_svd, svd, explained
 
 
 # ============================================================
@@ -228,18 +349,59 @@ def cluster_top_brands(seller_text_df: pd.DataFrame, listings: pd.DataFrame,
 # 메인
 # ============================================================
 
-def run(min_listings_per_seller: int = 3,
-        brand_weight: int = 5, title_weight: int = 2,
-        desc_weight: int = 1) -> dict:
-    """H1 분석 메인 흐름.
+def build_brand_matrix(listings: pd.DataFrame,
+                       min_listings_per_seller: int = 5,
+                       min_sellers_per_brand: int = 3):
+    """셀러 × 브랜드 공동출현 행렬 구성.
 
-    Args:
-        min_listings_per_seller: 매물이 N건 미만인 셀러는 제외 (시그니처 추정 불가)
-        brand_weight: 브랜드 텍스트 반복 횟수 (기본 5)
-        title_weight: 제목 반복 횟수 (기본 2)
-        desc_weight: 본문 반복 횟수 (기본 1, 0 으로 본문 제외 가능)
+    TF-IDF 가중치 적용:
+      TF = log(1 + 매물수) — 단순 카운트의 scale 효과 완화
+      IDF = log(N / 브랜드 취급 셀러수 + 1) + 1 — 흔한 브랜드 다운웨이팅
+    L2 정규화로 셀러별 매물 수 차이 제거.
     """
-    utils.section("H1: 셀러 시그니처 클러스터링")
+    from sklearn.preprocessing import normalize
+
+    df = listings[listings["brand"].notna()].copy()
+    df = df.groupby(["seller_id", "brand"]).size().reset_index(name="n")
+
+    # 셀러 필터
+    seller_total = df.groupby("seller_id")["n"].sum()
+    valid_sellers = seller_total[seller_total >= min_listings_per_seller].index
+    df = df[df["seller_id"].isin(valid_sellers)]
+
+    # 브랜드 필터 (희귀 브랜드 제거)
+    brand_seller_cnt = df.groupby("brand")["seller_id"].nunique()
+    valid_brands = brand_seller_cnt[brand_seller_cnt >= min_sellers_per_brand].index
+    df = df[df["brand"].isin(valid_brands)]
+
+    pivot = df.pivot_table(index="seller_id", columns="brand",
+                           values="n", fill_value=0)
+    X_raw = pivot.values.astype(float)
+    N = X_raw.shape[0]
+
+    TF = np.log1p(X_raw)
+    IDF = np.log(N / ((X_raw > 0).sum(axis=0) + 1)) + 1
+    X_tfidf = normalize(TF * IDF, norm="l2")
+
+    return X_tfidf, pivot.index.tolist(), pivot.columns.tolist(), X_raw
+
+
+def run(min_listings_per_seller: int = 5,
+        min_sellers_per_brand: int = 3,
+        svd_components: int = 15,
+        umap_components: int = 10,
+        min_cluster_size: int = 5) -> dict:
+    """H1 분석 메인 흐름 — 셀러×브랜드 공동출현 행렬 기반.
+
+    텍스트 TF-IDF 대신 브랜드 포트폴리오 행렬을 직접 구성:
+      - 투명성: 피처가 브랜드명 그 자체 → 클러스터 해석 직관적
+      - 정확성: 브랜드 반복 텍스트 trick 없이 실제 취급 패턴 반영
+      - 파이프라인: 브랜드 행렬 → SVD → UMAP → HDBSCAN
+    """
+    import warnings
+    warnings.filterwarnings("ignore")
+
+    utils.section("H1: 셀러 시그니처 클러스터링 (브랜드 공동출현 행렬)")
     utils.setup_korean_font()
 
     # 1. 데이터 로드
@@ -248,106 +410,166 @@ def run(min_listings_per_seller: int = 3,
         print("  ✗ 매물 데이터 없음 — 수집 후 재실행")
         return {}
 
-    seller_text = build_seller_text(
-        listings,
-        brand_weight=brand_weight,
-        title_weight=title_weight,
-        desc_weight=desc_weight,
+    # brand NULL 50%+ 셀러 제외
+    brand_null_rate = listings.groupby("seller_id")["brand"].apply(
+        lambda x: x.isna().mean()
     )
-    seller_text = seller_text[seller_text["n_listings"] >= min_listings_per_seller]
-    utils.bullet(
-        "분석 대상 셀러",
-        f"{len(seller_text)}명 (매물 {min_listings_per_seller}+ 보유)",
+    brand_unreliable = set(brand_null_rate[brand_null_rate > 0.5].index)
+    if brand_unreliable:
+        utils.bullet("brand 신뢰 불가 셀러 제외", f"{len(brand_unreliable)}명")
+        listings = listings[~listings["seller_id"].isin(brand_unreliable)]
+
+    # 2. 브랜드 공동출현 행렬
+    X_tfidf, sellers, brand_names, X_raw = build_brand_matrix(
+        listings, min_listings_per_seller, min_sellers_per_brand
     )
-    utils.bullet(
-        "시그니처 가중치",
-        f"brand×{brand_weight}, title×{title_weight}, desc×{desc_weight}",
-    )
+    n_sellers = len(sellers)
+    utils.bullet("분석 대상 셀러", f"{n_sellers}명 (매물 {min_listings_per_seller}+ 보유)")
+    utils.bullet("브랜드 피처", f"{len(brand_names)}개 (셀러 {min_sellers_per_brand}명+ 취급)")
+    utils.bullet("행렬 밀도", f"{(X_raw > 0).mean():.3f}")
 
-    if len(seller_text) < 10:
-        print(f"  ✗ 셀러 수 부족 ({len(seller_text)} < 10) — 수집 더 필요")
-        return {"status": "insufficient_data", "n_sellers": len(seller_text)}
+    if n_sellers < 10:
+        print(f"  ✗ 셀러 수 부족 ({n_sellers} < 10)")
+        return {"status": "insufficient_data", "n_sellers": n_sellers}
 
-    # 2. 벡터화
-    X, vectorizer = vectorize_sellers(seller_text)
-    utils.bullet("TF-IDF 차원", f"{X.shape[0]} sellers × {X.shape[1]} features")
+    # 3. SVD 차원 축소
+    utils.section("SVD 차원 축소")
+    svd = TruncatedSVD(n_components=svd_components, random_state=42)
+    X_svd = svd.fit_transform(X_tfidf)
+    explained = svd.explained_variance_ratio_.sum()
+    utils.bullet(f"SVD {svd_components}차원", f"설명 분산 {explained:.1%}")
 
-    # 3. K-means + 최적 K
-    utils.section("K-means 최적 K 탐색")
-    km_model, km_labels, all_results = kmeans_with_optimal_k(X)
-    for r in all_results:
-        utils.bullet(f"k={r['k']}", f"silhouette = {r['silhouette']:.4f}")
+    # 4. HDBSCAN — SVD 공간에서 직접 클러스터링
+    # UMAP → HDBSCAN 파이프라인은 UMAP이 로컬 구조를 과도하게 확대해
+    # 실제로 응집되지 않은 셀러도 전문형으로 분류하는 과클러스터링 문제 발생
+    # (SVD 공간 실루엣 0.117로 확인) → SVD 공간에서 직접 클러스터링
+    utils.section("HDBSCAN 클러스터링 (SVD 공간)")
+    _, hdb_labels = hdbscan_clusters(X_svd, min_cluster_size=min_cluster_size)
+    if hdb_labels is None:
+        return {"status": "hdbscan_unavailable"}
 
-    if km_model is None:
-        return {"status": "kmeans_failed"}
+    # 5. 내부 응집도 낮은 클러스터 강등 (잡화형으로 재분류)
+    # 브랜드 행렬이 sparse해 HDBSCAN이 밀도 희박 클러스터를 만들 수 있음
+    # 내부 cosine similarity < 0.3 → 실제 공유 브랜드 없는 인위적 클러스터로 판단
+    from sklearn.metrics.pairwise import cosine_similarity as _cos_sim
+    hdb_labels = np.array(hdb_labels)
+    demoted = 0
+    for cid in sorted(set(hdb_labels)):
+        if cid == -1:
+            continue
+        mask = hdb_labels == cid
+        if mask.sum() < 3:
+            continue
+        X_c = X_svd[mask]
+        sim = _cos_sim(X_c)
+        np.fill_diagonal(sim, np.nan)
+        mean_sim = float(np.nanmean(sim))
+        if mean_sim < 0.3:
+            hdb_labels[mask] = -1
+            demoted += 1
+    if demoted:
+        utils.bullet("응집도 미달 클러스터 잡화형 강등", f"{demoted}개 (내부 유사도 < 0.3)")
 
-    best_k = km_model.n_clusters
-    utils.bullet("최적 K", best_k)
+    n_clusters = len(set(hdb_labels)) - (1 if -1 in hdb_labels else 0)
+    n_generalist = int((hdb_labels == -1).sum())
+    n_specialist = n_sellers - n_generalist
+    utils.bullet("발견된 클러스터 수", n_clusters)
+    utils.bullet("전문형 셀러", f"{n_specialist}명 ({n_specialist/n_sellers:.1%})")
+    utils.bullet("잡화형 셀러 (noise)", f"{n_generalist}명 ({n_generalist/n_sellers:.1%})")
 
-    # 4. 클러스터 해석
-    utils.section("클러스터별 대표 키워드/브랜드")
-    keywords = cluster_top_keywords(X, km_labels, vectorizer)
-    brands = cluster_top_brands(seller_text, listings, km_labels)
+    # 6. 클러스터 해석 — 브랜드 TF-IDF 평균으로 대표 브랜드 추출
+    utils.section("클러스터별 대표 브랜드")
     cluster_summary = {}
-    for c in sorted(keywords.keys()):
-        n_sellers = int((km_labels == c).sum())
-        utils.bullet(f"클러스터 {c} ({n_sellers}명)",
-                     f"브랜드: {', '.join(brands.get(c, [])[:3])}")
-        utils.bullet(f"  → 키워드", ", ".join(keywords[c][:8]))
-        cluster_summary[c] = {
-            "n_sellers": n_sellers,
-            "keywords": keywords[c],
-            "top_brands": brands.get(c, []),
+    label_arr = np.array(hdb_labels)
+    X_tfidf_arr = np.array(X_tfidf)
+
+    for c in sorted(set(hdb_labels)):
+        if c == -1:
+            continue
+        mask = label_arr == c
+        n_c = int(mask.sum())
+
+        # 클러스터 내 평균 TF-IDF → 상위 브랜드
+        mean_vec = X_tfidf_arr[mask].mean(axis=0)
+        top_idx = mean_vec.argsort()[::-1][:10]
+        top_brands = [brand_names[i] for i in top_idx]
+
+        # top-3 브랜드 집중도 (매물 기준)
+        cluster_sellers = [sellers[i] for i in range(len(sellers)) if mask[i]]
+        sub = listings[listings["seller_id"].isin(cluster_sellers)]["brand"].dropna()
+        top3_share = (sub.value_counts().head(3).sum() / len(sub)) if len(sub) else 0
+
+        utils.bullet(
+            f"클러스터 {c} ({n_c}명, top3={top3_share:.0%})",
+            f"{', '.join(top_brands[:4])}"
+        )
+        cluster_summary[int(c)] = {
+            "n_sellers": n_c,
+            "top3_brand_share": round(top3_share, 3),
+            "top_brands": top_brands,
         }
 
-    # 5. 셀러-클러스터 라벨 저장 → H2·H3에서 사용
+    # 7. 셀러-클러스터 라벨 저장
     seller_clusters = pd.DataFrame({
-        "seller_id": seller_text["seller_id"].values,
-        "cluster": km_labels,
+        "seller_id": sellers,
+        "cluster": hdb_labels,
     })
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     seller_clusters.to_parquet(CACHE_DIR / "seller_clusters.parquet", index=False)
     utils.bullet("셀러-클러스터 라벨 저장",
                  str(CACHE_DIR / "seller_clusters.parquet"))
 
-    # 6. 결과 저장
+    # 8. 결과 저장
     payload = {
-        "n_sellers": len(seller_text),
-        "best_k": best_k,
-        "best_silhouette": next(r["silhouette"] for r in all_results if r["k"] == best_k),
-        "all_k_silhouette": [
-            {"k": r["k"], "silhouette": r["silhouette"]} for r in all_results
-        ],
+        "n_sellers": n_sellers,
+        "n_clusters": n_clusters,
+        "n_specialist": n_specialist,
+        "n_generalist": n_generalist,
+        "specialist_rate": round(n_specialist / n_sellers, 4),
+        "svd_explained_variance": round(explained, 4),
         "clusters": cluster_summary,
     }
     utils.save_result("h1_clustering", payload)
 
-    # 7. PCA 시각화
+    # 9. SVD 2D 시각화
     try:
-        plot_clusters(X, km_labels, seller_text)
+        plot_clusters(X_svd, hdb_labels,
+                      pd.DataFrame({"seller_id": sellers}))
     except Exception as e:
         print(f"  시각화 스킵: {e}")
 
     return payload
 
 
-def plot_clusters(X, labels, seller_text_df):
-    """PCA 2D 산점도. 한글 폰트 설정 후 호출."""
+def plot_clusters(X_svd, labels, seller_text_df):
+    """SVD 2D 산점도 (run()이 이미 SVD를 수행한 행렬을 전달).
+
+    noise(-1) 셀러는 회색 반투명으로 표시해 잡화형 셀러 비중을 시각화.
+    """
     import matplotlib.pyplot as plt
     from sklearn.decomposition import TruncatedSVD
 
-    svd = TruncatedSVD(n_components=2, random_state=42)
-    X2 = svd.fit_transform(X)
+    # 시각화용 2차원 추가 축소
+    svd2 = TruncatedSVD(n_components=2, random_state=42)
+    X2 = svd2.fit_transform(X_svd)
 
-    fig, ax = plt.subplots(figsize=(10, 7))
-    for c in sorted(set(labels)):
+    fig, ax = plt.subplots(figsize=(11, 8))
+    # noise 먼저 그려서 클러스터가 위에 오게
+    noise_mask = labels == -1
+    if noise_mask.any():
+        ax.scatter(X2[noise_mask, 0], X2[noise_mask, 1],
+                   color="lightgray", alpha=0.3, s=20, label="잡화형 (noise)")
+    unique_clusters = sorted(c for c in set(labels) if c != -1)
+    for c in unique_clusters:
         mask = labels == c
-        ax.scatter(X2[mask, 0], X2[mask, 1], label=f"cluster {c}",
-                   alpha=0.7, s=50)
-    ax.set_xlabel("Component 1")
-    ax.set_ylabel("Component 2")
-    ax.set_title("Seller Signature Clusters (TruncatedSVD 2D)")
-    ax.legend()
+        ax.scatter(X2[mask, 0], X2[mask, 1], label=f"C{c}", alpha=0.8, s=60)
+    ax.set_xlabel("SVD Component 1")
+    ax.set_ylabel("SVD Component 2")
+    n_clusters = len(unique_clusters)
+    n_noise = noise_mask.sum()
+    ax.set_title(f"Seller Signature Clusters — HDBSCAN\n"
+                 f"{n_clusters}개 클러스터 / 잡화형 {n_noise}명 ({n_noise/len(labels):.0%})")
+    ax.legend(loc="upper right", fontsize=7, ncol=2)
     utils.save_figure(fig, "h1_clusters_2d")
     plt.close(fig)
 
@@ -355,18 +577,16 @@ def plot_clusters(X, labels, seller_text_df):
 if __name__ == "__main__":
     import argparse
     p = argparse.ArgumentParser()
-    p.add_argument("--min-listings", type=int, default=5,
-                   help="셀러당 최소 매물 수 (기본 5). 5+: 시그니처 안정. 3: 표본 더 많이.")
-    p.add_argument("--brand-weight", type=int, default=5,
-                   help="브랜드 텍스트 반복 횟수 (기본 5). 보일러플레이트 잔존 시 7~10으로 상향.")
-    p.add_argument("--title-weight", type=int, default=2,
-                   help="제목 반복 횟수 (기본 2)")
-    p.add_argument("--desc-weight", type=int, default=1,
-                   help="본문 반복 횟수 (기본 1). 0=본문 제외, 보일러플레이트 잔존 시 권장.")
+    p.add_argument("--min-listings", type=int, default=5)
+    p.add_argument("--min-sellers-per-brand", type=int, default=3)
+    p.add_argument("--svd-components", type=int, default=15)
+    p.add_argument("--umap-components", type=int, default=10)
+    p.add_argument("--min-cluster-size", type=int, default=5)
     args = p.parse_args()
     run(
         min_listings_per_seller=args.min_listings,
-        brand_weight=args.brand_weight,
-        title_weight=args.title_weight,
-        desc_weight=args.desc_weight,
+        min_sellers_per_brand=args.min_sellers_per_brand,
+        svd_components=args.svd_components,
+        umap_components=args.umap_components,
+        min_cluster_size=args.min_cluster_size,
     )

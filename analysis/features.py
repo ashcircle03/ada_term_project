@@ -89,15 +89,21 @@ def seller_aggregates(listings: pd.DataFrame) -> pd.DataFrame:
     if listings.empty:
         return pd.DataFrame()
 
-    agg = listings.groupby("seller_id").agg(
-        n_listings=("product_id", "count"),
-        n_sold=("is_sold", "sum"),
-        avg_price=("price_final", "mean"),
-        median_price=("price_final", "median"),
-        avg_discount=("discount_pct", "mean"),
-        median_likes=("likes", "median"),
-        avg_n_photos=("n_photos", "mean"),
-    ).reset_index()
+    agg_dict = {
+        "n_listings":  ("product_id", "count"),
+        "n_sold":      ("is_sold", "sum"),
+        "avg_price":   ("price_final", "mean"),
+        "median_price":("price_final", "median"),
+        "avg_discount":("discount_pct", "mean"),
+        "median_likes":("likes", "median"),
+        "avg_n_photos":("n_photos", "mean"),
+    }
+    if "like_count" in listings.columns:
+        agg_dict["avg_like_count"] = ("like_count", "mean")
+    if "view_count" in listings.columns:
+        agg_dict["avg_view_count"] = ("view_count", "mean")
+
+    agg = listings.groupby("seller_id").agg(**agg_dict).reset_index()
     agg["sold_rate"] = agg["n_sold"] / agg["n_listings"]
     return agg
 
