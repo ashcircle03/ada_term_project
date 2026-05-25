@@ -76,7 +76,7 @@ def cmd_fill(args):
     """condition/like_count/view_count 없는 매물 상세 페이지 재크롤링."""
     crawler = Crawler()
     with db.get_conn() as conn:
-        crawler.fill_listing_details(conn, limit=args.limit)
+        crawler.fill_listing_details(conn, limit=args.limit, shard_id=args.shard_id, n_shards=args.n_shards)
 
 
 def cmd_stats(args):
@@ -124,7 +124,9 @@ def main():
     sp.add_argument("--limit", type=int, default=1100)
 
     sp = sub.add_parser("fill")
-    sp.add_argument("--limit", type=int, default=30000)
+    sp.add_argument("--limit", type=int, default=100000)
+    sp.add_argument("--shard-id", type=int, default=0, dest="shard_id")
+    sp.add_argument("--n-shards", type=int, default=1, dest="n_shards")
 
     sp = sub.add_parser("full")
     sp.add_argument("--limit", type=int, default=100)

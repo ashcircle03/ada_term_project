@@ -234,7 +234,7 @@ class Crawler:
     # ============================================================
     # 2b단계: Apollo 필드 채우기 (condition/like_count/view_count 없는 매물)
     # ============================================================
-    def fill_listing_details(self, conn, limit: int = 5000):
+    def fill_listing_details(self, conn, limit: int = 5000, shard_id: int = 0, n_shards: int = 1):
         """condition IS NULL인 기존 매물의 상세 페이지를 개별 재크롤링.
 
         셀러 페이지 카드에서 발견된 매물은 condition/like_count/view_count가 없음.
@@ -244,11 +244,12 @@ class Crawler:
         rows = conn.execute(
             """SELECT product_id, seller_id FROM listing
                WHERE seller_id != '_pending_' AND condition IS NULL
+                 AND (rowid % ? = ?)
                LIMIT ?""",
-            (limit,),
+            (n_shards, shard_id, limit),
         ).fetchall()
 
-        logger.info(f"[FILL] {len(rows)}개 매물 Apollo 필드 채우기 시작")
+        logger.info(f"[FILL shard {shard_id}/{n_shards}] {len(rows)}개 매물 Apollo 필드 채우기 시작")
         success = fail = 0
 
         for row in rows:

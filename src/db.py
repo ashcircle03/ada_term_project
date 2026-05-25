@@ -133,6 +133,7 @@ def get_conn(db_path=None):
     """with 블록으로 안전하게 커넥션 사용."""
     db_path = db_path or config.DB_PATH
     conn = sqlite3.connect(db_path)
+    conn.execute("PRAGMA journal_mode=WAL")
     conn.row_factory = sqlite3.Row
     try:
         yield conn

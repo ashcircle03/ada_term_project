@@ -67,8 +67,8 @@ SEED_BRANDS = [
 # 크롤링 정책 (서버 부담 최소화)
 # ============================================================
 # 약관 정신 존중 + 차단 회피를 위한 보수적 값
-REQUEST_DELAY_MIN = 2.0  # 최소 요청 간격 (초)
-REQUEST_DELAY_MAX = 4.0  # 최대 요청 간격 (랜덤 지터)
+REQUEST_DELAY_MIN = 1.0  # 최소 요청 간격 (초)
+REQUEST_DELAY_MAX = 2.0  # 최대 요청 간격 (랜덤 지터)
 TIMEOUT = 15  # HTTP 타임아웃
 MAX_RETRIES = 3  # 실패 시 재시도 횟수
 BACKOFF_BASE = 5  # 재시도 간 exponential backoff 기본 초
