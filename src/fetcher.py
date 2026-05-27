@@ -30,7 +30,9 @@ class Fetcher:
         })
         self.save_html = save_html
         if save_html:
-            config.RAW_HTML_DIR.mkdir(parents=True, exist_ok=True)
+            raw_dir = config.RAW_HTML_DIR
+            target = raw_dir.resolve() if raw_dir.is_symlink() else raw_dir
+            target.mkdir(parents=True, exist_ok=True)
 
     def _delay(self):
         """매 요청 사이 랜덤 지연. 일정한 패턴이면 봇 탐지 쉬움."""
