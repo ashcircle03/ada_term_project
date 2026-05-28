@@ -236,7 +236,8 @@ def parse_product_page(html: str, url: str) -> dict | None:
     # 6. 가격
     ap_price = ap.get("price")
     ap_original = ap.get("originalPrice")
-    ap_discount = ap.get("discountRate") or 0
+    # Apollo는 snake_case (discount_rate). 과거 camelCase로 읽어 거의 0으로 저장됐던 버그 수정.
+    ap_discount = ap.get("discount_rate") or ap.get("discountRate") or 0
 
     if ap_price is not None:
         try:
@@ -252,6 +253,11 @@ def parse_product_page(html: str, url: str) -> dict | None:
         data["discount_pct"] = int(ap_discount)
     except (TypeError, ValueError):
         data["discount_pct"] = 0
+
+    # price_original: Apollo엔 원가 필드가 없고 price=할인가임을 검증함.
+    # 할인이 있으면 price/(1-rate)로 원가 유도 (플랫폼 최종가 반올림 때문에 ±오차).
+    if data.get("price_original") is None and data.get("price_final") and 0 < data["discount_pct"] < 100:
+        data["price_original"] = round(data["price_final"] / (1 - data["discount_pct"] / 100))
 
     # 가격 폴백: 텍스트 휴리스틱
     if "price_final" not in data:
