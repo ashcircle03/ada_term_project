@@ -28,18 +28,18 @@ def run(limit: int = 0) -> None:
         db._migrate(conn)
 
         rows = conn.execute(
-            "SELECT product_id FROM listing WHERE seller_id != '_pending_'"
+            "SELECT product_id, seller_id FROM listing WHERE seller_id != '_pending_'"
         ).fetchall()
 
-    product_ids = [r[0] for r in rows]
+    products = [(r[0], r[1]) for r in rows]
     if limit:
-        product_ids = product_ids[:limit]
+        products = products[:limit]
 
-    total = len(product_ids)
+    total = len(products)
     updated = skipped = errors = 0
 
     with db.get_conn() as conn:
-        for i, pid in enumerate(product_ids, 1):
+        for i, (pid, existing_seller_id) in enumerate(products, 1):
             url = f"{config.BASE_URL}/product/{pid}/x"
             path = raw_dir / f"{_url_to_hash(url)}.html"
 
@@ -58,6 +58,10 @@ def run(limit: int = 0) -> None:
             if not parsed:
                 skipped += 1
                 continue
+
+            # 파서가 셀러 링크를 못 찾으면 DB의 기존 seller_id 보존 (reparse는 기존 행 갱신)
+            if not parsed.get("seller_id"):
+                parsed["seller_id"] = existing_seller_id
 
             try:
                 db.upsert_listing(conn, parsed)
