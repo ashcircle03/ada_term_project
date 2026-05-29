@@ -1,0 +1,173 @@
+{
+  "n_sellers_clustered": 9615,
+  "coverage_of_all_sellers": 0.867,
+  "best_k": 3,
+  "silhouette": {
+    "3": 0.287,
+    "4": 0.22,
+    "5": 0.239,
+    "6": 0.213,
+    "7": 0.204,
+    "8": 0.199
+  },
+  "archetype_profile": [
+    {
+      "archetype": 0,
+      "n_sellers": 2377,
+      "sell_through": 0.242,
+      "brand_hhi": 0.132,
+      "share_men": 0.206,
+      "share_new": 0.184,
+      "median_price": 70000.0,
+      "avg_n_photos": 4.649,
+      "top_brands": "Japanese Vintage, Stone Island, Vintage"
+    },
+    {
+      "archetype": 1,
+      "n_sellers": 6574,
+      "sell_through": 0.215,
+      "brand_hhi": 0.129,
+      "share_men": 0.936,
+      "share_new": 0.182,
+      "median_price": 142750.0,
+      "avg_n_photos": 4.671,
+      "top_brands": "Stone Island, Polo Ralph Lauren, Nike"
+    },
+    {
+      "archetype": 2,
+      "n_sellers": 664,
+      "sell_through": 0.149,
+      "brand_hhi": 0.7,
+      "share_men": 0.744,
+      "share_new": 0.318,
+      "median_price": 150000.0,
+      "avg_n_photos": 5.201,
+      "top_brands": "Japanese Vintage, Stone Island, Polo Ralph Lauren"
+    }
+  ],
+  "kruskal": {
+    "H": 351.06,
+    "p": 5.858783467582833e-77
+  },
+  "sellthrough_range_across_archetypes": [
+    0.149,
+    0.242
+  ],
+  "benchmark_gap": {
+    "0": {
+      "n_photos": {
+        "top": 4.256,
+        "bottom": 4.97,
+        "gap": -0.714
+      },
+      "desc_len": {
+        "top": 104.009,
+        "bottom": 172.403,
+        "gap": -68.393
+      },
+      "kw_measure": {
+        "top": 0.42,
+        "bottom": 0.565,
+        "gap": -0.145
+      },
+      "kw_flaw": {
+        "top": 0.163,
+        "bottom": 0.239,
+        "gap": -0.076
+      },
+      "kw_material": {
+        "top": 0.246,
+        "bottom": 0.373,
+        "gap": -0.127
+      },
+      "kw_usage": {
+        "top": 0.412,
+        "bottom": 0.368,
+        "gap": 0.045
+      },
+      "relative_price_z": {
+        "top": -0.038,
+        "bottom": -0.172,
+        "gap": 0.134
+      }
+    },
+    "1": {
+      "n_photos": {
+        "top": 4.37,
+        "bottom": 4.913,
+        "gap": -0.543
+      },
+      "desc_len": {
+        "top": 114.501,
+        "bottom": 143.477,
+        "gap": -28.976
+      },
+      "kw_measure": {
+        "top": 0.553,
+        "bottom": 0.644,
+        "gap": -0.091
+      },
+      "kw_flaw": {
+        "top": 0.144,
+        "bottom": 0.228,
+        "gap": -0.083
+      },
+      "kw_material": {
+        "top": 0.254,
+        "bottom": 0.296,
+        "gap": -0.042
+      },
+      "kw_usage": {
+        "top": 0.341,
+        "bottom": 0.342,
+        "gap": -0.001
+      },
+      "relative_price_z": {
+        "top": 0.037,
+        "bottom": 0.062,
+        "gap": -0.025
+      }
+    },
+    "2": {
+      "n_photos": {
+        "top": 4.778,
+        "bottom": 5.494,
+        "gap": -0.716
+      },
+      "desc_len": {
+        "top": 168.589,
+        "bottom": 227.818,
+        "gap": -59.229
+      },
+      "kw_measure": {
+        "top": 0.459,
+        "bottom": 0.6,
+        "gap": -0.141
+      },
+      "kw_flaw": {
+        "top": 0.162,
+        "bottom": 0.265,
+        "gap": -0.103
+      },
+      "kw_material": {
+        "top": 0.303,
+        "bottom": 0.366,
+        "gap": -0.063
+      },
+      "kw_usage": {
+        "top": 0.33,
+        "bottom": 0.321,
+        "gap": 0.009
+      },
+      "relative_price_z": {
+        "top": 0.115,
+        "bottom": 0.171,
+        "gap": -0.056
+      }
+    }
+  },
+  "wishlist": {
+    "n_owners_mapped": 950,
+    "wish_hhi_vs_sellthrough_corr": -0.12
+  }
+}

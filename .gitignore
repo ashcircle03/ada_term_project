@@ -18,5 +18,7 @@ logs/
 # Jupyter
 .ipynb_checkpoints/
 
-# DB는 포함 (4.1MB, 크롤 상태 보존용)
-# data/fruitsfamily.db → 포함됨
+# DB (190MB+, 크롤할 때마다 변경 → git 추적 제외. 로컬 보존/재크롤로 충분)
+data/fruitsfamily.db
+data/fruitsfamily.db-wal
+data/fruitsfamily.db-shm

@@ -1,0 +1,21 @@
+{
+  "n_listings": 284654,
+  "n_sellers": 11095,
+  "overall_sell_through": 0.2151,
+  "unsold_pct": 0.7849,
+  "dead_stock_90d_pct": 0.5519,
+  "zero_sale_seller_pct": 0.1589,
+  "top10pct_sales_share": 0.3144,
+  "sold_by_age_bucket": {
+    "0-7d": 16.3,
+    "7-30d": 18.7,
+    "30-90d": 21.8,
+    "90-365d": 23.1,
+    "365d+": 21.5
+  },
+  "sold_by_photo_grp": {
+    "≤2": 26.4,
+    "3-5": 21.9,
+    "6+": 18.7
+  }
+}
