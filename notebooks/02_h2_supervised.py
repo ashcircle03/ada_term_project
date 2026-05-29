@@ -96,6 +96,42 @@ log_auc = cross_val_score(
 print(f"  (logistic controllable-only AUC = {log_auc:.4f})")
 
 # %% [markdown]
+# ## 2b. 추론 — 귀무가설 기각 (지도학습의 검정 틀)
+#
+# 지도학습엔 모수적 t-검정이 없으므로, 분포 가정 없이 **재표집/순열**로 검정한다.
+# (i) **라벨 순열검정**: y를 무작위로 섞어 만든 null AUC 분포와 관측 AUC를 비교 →
+#     귀무 "예측력=우연(AUC 0.5)"을 기각. (ii) **부트스트랩 ΔAUC 95% CI**: 동일 테스트셋을
+#     재표집해 두 모델의 AUC 차 분포를 구함 → CI가 0을 제외하면 "통제가능=구조" 귀무를 기각.
+
+# %%
+idx = np.arange(len(y))
+i_tr, i_te = train_test_split(idx, test_size=0.2, stratify=y, random_state=0)
+yte_ = y[i_te]
+def fit_pred(X):
+    return xgb().fit(X.iloc[i_tr], y[i_tr]).predict_proba(X.iloc[i_te])[:, 1]
+p_ctrl, p_str, p_full = fit_pred(X_ctrl), fit_pred(X_struct), fit_pred(X_full)
+obs_full = roc_auc_score(yte_, p_full)
+
+rng = np.random.RandomState(1); B = 1000
+null_auc = np.array([roc_auc_score(rng.permutation(yte_), p_full) for _ in range(B)])
+perm_p = (1 + np.sum(null_auc >= obs_full)) / (B + 1)
+print(f"  full AUC(test)={obs_full:.4f} | 순열 null {null_auc.mean():.3f}±{null_auc.std():.3f} | p={perm_p:.4f}")
+
+def boot_dauc(pa, pb, B=1000):
+    n = len(yte_); d = np.empty(B)
+    for b in range(B):
+        s = rng.randint(0, n, n)
+        d[b] = roc_auc_score(yte_[s], pa[s]) - roc_auc_score(yte_[s], pb[s])
+    return np.percentile(d, [2.5, 97.5])
+ci_str = boot_dauc(p_str, p_ctrl); ci_full = boot_dauc(p_full, p_ctrl)
+print(f"  ΔAUC 구조−통제가능 95%CI [{ci_str[0]:.3f}, {ci_str[1]:.3f}]")
+print(f"  ΔAUC 전체−통제가능 95%CI [{ci_full[0]:.3f}, {ci_full[1]:.3f}]")
+H2_INF = {"full_test_auc": round(float(obs_full), 4), "perm_p": float(perm_p),
+          "perm_null_mean": round(float(null_auc.mean()), 3),
+          "dAUC_struct_minus_ctrl_CI95": [round(float(ci_str[0]), 3), round(float(ci_str[1]), 3)],
+          "dAUC_full_minus_ctrl_CI95": [round(float(ci_full[0]), 3), round(float(ci_full[1]), 3)]}
+
+# %% [markdown]
 # ## 3. 기여 분해 — permutation importance (그룹 합산)
 #
 # 전체 모델에서 피처를 셔플했을 때 AUC 하락폭. 통제가능 vs 구조 그룹별 합산.
@@ -157,6 +193,7 @@ h2 = {
     "auc": auc,
     "logistic_controllable_auc": round(float(log_auc), 4),
     "auc_gap_full_minus_controllable": round(auc["full"]["auc_mean"] - auc["controllable"]["auc_mean"], 4),
+    "inference": H2_INF,
     "contribution_share": {k: float(v) for k, v in grp_share.items()},
     "top_features": {k: round(float(v), 4) for k, v in imp.head(12).items()},
     "controllable_auc_by_price_tier": het,

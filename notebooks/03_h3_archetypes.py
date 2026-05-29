@@ -103,6 +103,30 @@ for i, a in enumerate(order):
 fig.tight_layout(); fig.savefig(FIG / "h3_archetype_sellthrough.png", bbox_inches="tight"); plt.show()
 
 # %% [markdown]
+# ## 3b. 추론 — 군집 존재성(무작위 참조) + KW 효과크기
+#
+# 비지도엔 정답 라벨이 없으므로 검정이 두 층위다. (i) **군집 존재성**: 각 피처 열을
+# 독립적으로 셔플해 결합구조를 파괴한 **무작위 참조** 데이터의 실루엣 분포와 관측 실루엣을
+# 비교 → 귀무 "군집 구조 없음"을 기각(gap-statistic 계열). (ii) **외적 타당성**: 아키타입 간
+# sell-through 차이의 KW 검정에 **효과크기 ε²**를 덧붙여 유의성과 크기를 함께 본다.
+
+# %%
+rngs = np.random.RandomState(0); Bc = 50
+null_sil = []
+for _ in range(Bc):
+    Xn = np.column_stack([rngs.permutation(Xz[:, j]) for j in range(Xz.shape[1])])
+    lab = KMeans(n_clusters=best_k, n_init=5, random_state=0).fit_predict(Xn)
+    null_sil.append(silhouette_score(Xn, lab, sample_size=5000, random_state=0))
+null_sil = np.array(null_sil)
+obs_sil = sil[best_k]
+clust_p = (1 + np.sum(null_sil >= obs_sil)) / (Bc + 1)
+eps2 = (H - best_k + 1) / (len(sel_c) - best_k)   # KW 효과크기 ε²
+print(f"관측 실루엣 {obs_sil:.3f} vs 무작위참조 {null_sil.mean():.3f}±{null_sil.std():.3f}, p={clust_p:.3f}")
+print(f"KW 효과크기 ε² = {eps2:.3f}")
+H3_INF = {"obs_silhouette": round(float(obs_sil), 3), "null_silhouette_mean": round(float(null_sil.mean()), 3),
+          "clusterability_p": float(clust_p), "kw_epsilon_sq": round(float(eps2), 3)}
+
+# %% [markdown]
 # ## 4. 개인화 벤치마크 — 아키타입 내 상위 vs 하위 셀러의 표현 격차
 #
 # 셀러별 표현 평균을 구해, 같은 아키타입 안에서 sell-through 상위 33% vs 하위 33%가
@@ -138,7 +162,7 @@ fig.colorbar(im, ax=ax, shrink=0.7)
 fig.tight_layout(); fig.savefig(FIG / "h3_benchmark_gap.png", bbox_inches="tight"); plt.show()
 
 # %% [markdown]
-# ## 5. wishlist 취향 네트워크 (보조, 958셀러 서브셋)
+# ## 5. wishlist 취향 네트워크 (보조; 상세 분석은 05_p4_taste_network)
 #
 # 찜한 매물의 브랜드로 셀러 취향벡터 → 취향 유사도가 같은 아키타입에 모이는지.
 
@@ -174,6 +198,7 @@ h3 = {
     "silhouette": {int(k): round(v, 3) for k, v in sil.items()},
     "archetype_profile": json.loads(profile.reset_index().to_json(orient="records", force_ascii=False)),
     "kruskal": {"H": round(float(H), 2), "p": float(p)},
+    "inference": H3_INF,
     "sellthrough_range_across_archetypes": [round(float(profile["sell_through"].min()), 3),
                                             round(float(profile["sell_through"].max()), 3)],
     "benchmark_gap": bench,

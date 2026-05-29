@@ -1,0 +1,69 @@
+{
+  "R1_cohort": {
+    "n": 39528,
+    "sold_rate": 0.217,
+    "photo_sellthrough": {
+      "full": {
+        "≤2": 26.4,
+        "3-5": 21.9,
+        "6+": 18.7
+      },
+      "cohort": {
+        "≤2": 24.1,
+        "3-5": 22.1,
+        "6+": 19.5
+      }
+    },
+    "photo_OR": {
+      "full": 0.945,
+      "cohort": 0.984
+    },
+    "desc_OR": {
+      "full": 0.97,
+      "cohort": 0.98
+    }
+  },
+  "R2_psm": {
+    "caliper": 0.01,
+    "match_rate": 1.0,
+    "att": -0.0222,
+    "rr": 0.891,
+    "evalue": 1.49,
+    "smd_pre": {
+      "z_logp": 0.07,
+      "z_age": 0.225,
+      "z_relp": 0.123
+    },
+    "smd_post": {
+      "z_logp": 0.015,
+      "z_age": 0.021,
+      "z_relp": 0.01
+    }
+  },
+  "R3_auc_decomp": {
+    "controllable": 0.6237,
+    "item(no age)": 0.7653,
+    "age_only": 0.5302,
+    "item+age": 0.7668,
+    "full": 0.7863
+  },
+  "R4_cluster": {
+    "ari_mean": 1.0,
+    "specialist_archetype": 2,
+    "specialist_OR_controlled": 0.518,
+    "specialist_p_controlled": 0.0
+  },
+  "R5_p4": {
+    "matchable_ge1_all": 0.983,
+    "matchable_ge1_ex_top10": 0.8,
+    "median_wishers_ex_top10": 74.0,
+    "brand_mapped_frac": 0.338,
+    "caveats": "wisher=셀러(구매자 아님); item-level 아닌 brand-level 프록시"
+  },
+  "R6_zero_sale": {
+    "n": 1763,
+    "median_listings": 4.0,
+    "median_newest_age": 45.72972222222222,
+    "pct_stale_180d": 0.161
+  }
+}

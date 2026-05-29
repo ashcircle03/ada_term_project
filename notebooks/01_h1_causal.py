@@ -91,7 +91,7 @@ print(f"\nPseudo R² raw={m_raw.prsquared:.4f}  controlled={m_ctrl.prsquared:.4f
 # 통제 모델에서 셀러가 통제 가능한 표현 레버들의 방향·유의성.
 
 # %%
-levers = {"z_photos": "사진수", "z_desclen": "설명길이", "z_relprice": "상대가격(낮을수록↑기대)",
+levers = {"z_photos": "사진수", "z_desclen": "설명길이", "z_relprice": "상대가격(동종대비, +=고가)",
           "kw_measure": "실측", "kw_flaw": "하자고지", "kw_material": "소재",
           "kw_purchase": "구매/정품", "kw_usage": "사용이력", "kw_wash": "관리법"}
 conf = m_ctrl.conf_int()

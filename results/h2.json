@@ -16,6 +16,19 @@
   },
   "logistic_controllable_auc": 0.6116,
   "auc_gap_full_minus_controllable": 0.163,
+  "inference": {
+    "full_test_auc": 0.7881,
+    "perm_p": 0.000999000999000999,
+    "perm_null_mean": 0.5,
+    "dAUC_struct_minus_ctrl_CI95": [
+      0.138,
+      0.151
+    ],
+    "dAUC_full_minus_ctrl_CI95": [
+      0.159,
+      0.169
+    ]
+  },
   "contribution_share": {
     "구조(아이템)": 0.871,
     "통제가능(표현)": 0.129

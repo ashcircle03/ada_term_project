@@ -49,6 +49,12 @@
     "H": 351.06,
     "p": 5.858783467582833e-77
   },
+  "inference": {
+    "obs_silhouette": 0.287,
+    "null_silhouette_mean": 0.225,
+    "clusterability_p": 0.0196078431372549,
+    "kw_epsilon_sq": 0.036
+  },
   "sellthrough_range_across_archetypes": [
     0.149,
     0.242
@@ -167,7 +173,7 @@
     }
   },
   "wishlist": {
-    "n_owners_mapped": 950,
-    "wish_hhi_vs_sellthrough_corr": -0.12
+    "n_owners_mapped": 8830,
+    "wish_hhi_vs_sellthrough_corr": -0.095
   }
 }

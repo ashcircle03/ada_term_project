@@ -117,6 +117,8 @@ summary = {
     "sold_by_age_bucket": {k: round(v*100, 1) for k, v in by_age["mean"].items()},
     "sold_by_photo_grp": {str(k): round(v*100, 1) for k, v in
                           lst.groupby("photo_grp", observed=True)["is_sold"].mean().items()},
+    "sold_by_desc_grp": {str(k): round(v*100, 1) for k, v in
+                         lst.groupby("desc_grp", observed=True)["is_sold"].mean().items()},
 }
 print(json.dumps(summary, ensure_ascii=False, indent=2))
 (ROOT / "results").mkdir(exist_ok=True)
