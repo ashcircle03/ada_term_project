@@ -10,11 +10,15 @@
 # - R6 무판매 셀러 프로파일: 분투 vs 방치 (M8)
 
 # %%
-import json, sys
+import json, os, sys
 from pathlib import Path
 import numpy as np, pandas as pd
 import statsmodels.api as sm
-import matplotlib, matplotlib.pyplot as plt
+os.environ.setdefault("MPLCONFIGDIR", "/private/tmp/ada-matplotlib-cache")
+os.environ.setdefault("LOKY_MAX_CPU_COUNT", "8")
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 from sklearn.model_selection import cross_val_score, StratifiedKFold
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
@@ -78,7 +82,7 @@ R["R1_cohort"] = {"n": int(len(coh)), "sold_rate": round(float(coh.is_sold.mean(
 
 fig, ax = plt.subplots(figsize=(6,3.6)); comp.plot(kind="bar", ax=ax, rot=0)
 ax.set(title="사진수→전환: 전체 vs 성숙코호트(절단 통제)", ylabel="sold %"); fig.tight_layout()
-fig.savefig(FIG/"r1_cohort.png", bbox_inches="tight"); plt.show()
+fig.savefig(FIG/"r1_cohort.png", bbox_inches="tight"); plt.close(fig)
 
 # %% [markdown]
 # ## R2 · PSM 진단 — 공변량 균형(SMD) + E-value 민감도
@@ -147,7 +151,7 @@ ax.bar(list(auc.keys()), list(auc.values()), color=["#48a","#c44","#999","#c84",
 ax.axhline(0.5,ls="--",c="gray"); ax.set(title="AUC 분해: 통제가능 vs 아이템구조 vs 시간(age)", ylabel="5-fold AUC")
 ax.set_ylim(0.5,0.82); plt.xticks(rotation=20)
 for i,v in enumerate(auc.values()): ax.text(i,v+0.005,f"{v:.3f}",ha="center",fontsize=8)
-fig.tight_layout(); fig.savefig(FIG/"r3_auc_decomp.png", bbox_inches="tight"); plt.show()
+fig.tight_layout(); fig.savefig(FIG/"r3_auc_decomp.png", bbox_inches="tight"); plt.close(fig)
 
 # %% [markdown]
 # ## R4 · H3 군집 안정성(ARI) + 가격·카테고리 통제 후 archetype 효과
@@ -155,31 +159,50 @@ fig.tight_layout(); fig.savefig(FIG/"r3_auc_decomp.png", bbox_inches="tight"); p
 # %%
 sel = pd.read_parquet(CACHE/"features_seller.parquet")
 clusters = pd.read_parquet(CACHE/"seller_clusters.parquet")
+h3_meta = json.loads((ROOT/"results"/"h3.json").read_text(encoding="utf-8"))
+strategy = h3_meta.get("clustering_strategy", {})
 FEATS = ["brand_hhi","brand_entropy_norm","share_men","share_new","log_median_price","avg_n_photos"]
 selc = sel[sel.n_listings>=5].copy()
 Xz = StandardScaler().fit_transform(selc[FEATS].fillna(selc[FEATS].median()))
-labs = [KMeans(n_clusters=3,n_init=10,random_state=s).fit_predict(Xz) for s in [0,1,7,42,123]]
-aris = [adjusted_rand_score(labs[0],labs[i]) for i in range(1,len(labs))]
-print(f"군집 안정성 ARI(seed쌍 평균): {np.mean(aris):.3f}  (1=완전일치)")
+if strategy.get("selected_method") == "KMeans":
+    k_selected = int(h3_meta.get("best_k", 3))
+    labs = [KMeans(n_clusters=k_selected,n_init=20,random_state=s).fit_predict(Xz) for s in [0,1,7,42,123]]
+    aris = [adjusted_rand_score(labs[0],labs[i]) for i in range(1,len(labs))]
+    ari_mean = round(float(np.mean(aris)), 3)
+else:
+    ari_mean = None
+print(f"H3 선택 군집: {strategy.get('selected_method')} {strategy.get('selected_config')}")
+print(f"군집 안정성 ARI(seed쌍 평균): {ari_mean if ari_mean is not None else 'NA'}  (KMeans일 때만 계산)")
 
 # 가격·카테고리·신상품 통제 후 archetype 효과
 sb = selc.merge(clusters, on="seller_id", how="inner")
-spec = sb.groupby("archetype").brand_hhi.mean().idxmax()  # 전문가형 = HHI 최대
-print(f"전문가형(brand_hhi 최대) archetype = {spec}")
+sb_core = sb[sb.archetype != -1].copy()
+topic_st = sb_core.groupby("archetype").sell_through.mean()
+focal = int(topic_st.idxmin())
+print(f"저유동성 topic = {focal} (sell-through {topic_st.loc[focal]:.3f})")
 ml = lst.merge(clusters, on="seller_id", how="inner")
-Xa = pd.concat([pd.get_dummies(ml.archetype, prefix="arch", drop_first=False).drop(columns=[f"arch_{ml.archetype.mode()[0]}"]),
+ml = ml[ml.archetype != -1].copy()
+arch_dummies = pd.get_dummies(ml.archetype, prefix="arch", drop_first=False)
+baseline_col = f"arch_{ml.archetype.mode()[0]}"
+if baseline_col in arch_dummies:
+    arch_dummies = arch_dummies.drop(columns=[baseline_col])
+Xa = pd.concat([arch_dummies,
     pd.DataFrame({"z_logp": z(ml.log_price), "z_age": z(ml.age_days)}),
     pd.get_dummies(ml.category_l1,prefix="c",drop_first=True),
     pd.get_dummies(ml.condition,prefix="cond",drop_first=True)], axis=1).astype(float)
 ma = sm.Logit(ml.is_sold.values, sm.add_constant(Xa)).fit(disp=0, method="lbfgs", maxiter=300)
-spec_col = f"arch_{spec}"
-spec_or = float(np.exp(ma.params[spec_col])) if spec_col in ma.params else None
-spec_p = float(ma.pvalues[spec_col]) if spec_col in ma.params else None
-print(f"가격·카테고리·컨디션·age 통제 후 전문가형 OR={spec_or:.3f}, p={spec_p:.4f}"
-      if spec_or else "전문가형이 기준범주로 흡수됨")
-R["R4_cluster"] = {"ari_mean": round(float(np.mean(aris)),3), "specialist_archetype": int(spec),
-    "specialist_OR_controlled": round(spec_or,3) if spec_or else None,
-    "specialist_p_controlled": round(spec_p,4) if spec_p else None}
+focal_col = f"arch_{focal}"
+focal_or = float(np.exp(ma.params[focal_col])) if focal_col in ma.params else None
+focal_p = float(ma.pvalues[focal_col]) if focal_col in ma.params else None
+print(f"가격·카테고리·컨디션·age 통제 후 저유동성 topic OR={focal_or:.3f}, p={focal_p:.4f}"
+      if focal_or is not None else "저유동성 topic이 기준범주로 흡수됨")
+R["R4_cluster"] = {"selected_method": strategy.get("selected_method"),
+    "selected_config": strategy.get("selected_config"),
+    "ari_mean": ari_mean, "low_liquidity_archetype": int(focal),
+    "low_liquidity_sellthrough": round(float(topic_st.loc[focal]), 3),
+    "low_liquidity_OR_controlled": round(focal_or,3) if focal_or is not None else None,
+    "low_liquidity_p_controlled": round(focal_p,4) if focal_p is not None else None,
+    "topic_dominance_median": h3_meta.get("inference", {}).get("topic_dominance_median")}
 
 # %% [markdown]
 # ## R5 · P4 디바이어싱 — 인기 브랜드 제외 시 매칭가능성

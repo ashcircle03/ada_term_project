@@ -4,6 +4,25 @@
   "overall_sell_through": 0.2151,
   "unsold_pct": 0.7849,
   "dead_stock_90d_pct": 0.5519,
+  "cohort_robustness": {
+    "unsold_by_year": {
+      "2020": 89.8,
+      "2021": 88.0,
+      "2022": 80.4,
+      "2023": 77.9,
+      "2024": 78.7,
+      "2025": 77.5,
+      "2026": 79.0
+    },
+    "matured_ge1y_unsold": 0.786,
+    "recent_lt1y_unsold": 0.785,
+    "recent_lt1y_share": 0.806,
+    "matured_sellthrough_by_age": {
+      "1~2년": 0.217,
+      "2~3년": 0.216,
+      "3년+": 0.195
+    }
+  },
   "zero_sale_seller_pct": 0.1589,
   "top10pct_sales_share": 0.3144,
   "sold_by_age_bucket": {

@@ -1,179 +1,601 @@
 {
   "n_sellers_clustered": 9615,
   "coverage_of_all_sellers": 0.867,
-  "best_k": 3,
-  "silhouette": {
-    "3": 0.287,
-    "4": 0.22,
-    "5": 0.239,
-    "6": 0.213,
-    "7": 0.204,
-    "8": 0.199
+  "clustering_strategy": {
+    "selected_method": "NMF",
+    "selected_config": "brand+brand_category_l2 tfidf, k=7",
+    "rationale": "NMF gives interpretable soft taste topics; k is selected by unsupervised topic balance and dominance, not sell-through.",
+    "selection_rule": {
+      "min_topic_size": 300,
+      "max_topic_share": 0.35,
+      "min_dominance_median": 0.55,
+      "tie_break": "smallest k satisfying unsupervised balance and dominance constraints"
+    }
+  },
+  "best_k": 7,
+  "topic_token_space": "brand + brand|category_l2",
+  "topic_model_comparison": [
+    {
+      "k": 3,
+      "silhouette_w": 0.373,
+      "kw_H": 452.6006111019489,
+      "kw_p": 5.2363183971660084e-99,
+      "kw_epsilon_sq": 0.047,
+      "sellthrough_range": 0.075,
+      "dominance_median": 0.783,
+      "min_topic_size": 1451,
+      "max_topic_size": 5940,
+      "max_topic_share": 0.618,
+      "reconstruction_error": 96.016
+    },
+    {
+      "k": 4,
+      "silhouette_w": 0.297,
+      "kw_H": 450.8140491607705,
+      "kw_p": 2.17206089128324e-97,
+      "kw_epsilon_sq": 0.047,
+      "sellthrough_range": 0.085,
+      "dominance_median": 0.698,
+      "min_topic_size": 1379,
+      "max_topic_size": 4385,
+      "max_topic_share": 0.456,
+      "reconstruction_error": 95.636
+    },
+    {
+      "k": 5,
+      "silhouette_w": 0.256,
+      "kw_H": 372.45232949788465,
+      "kw_p": 2.4852541322581936e-79,
+      "kw_epsilon_sq": 0.038,
+      "sellthrough_range": 0.08,
+      "dominance_median": 0.631,
+      "min_topic_size": 1101,
+      "max_topic_size": 3924,
+      "max_topic_share": 0.408,
+      "reconstruction_error": 95.328
+    },
+    {
+      "k": 6,
+      "silhouette_w": 0.264,
+      "kw_H": 448.2510409052564,
+      "kw_p": 1.1709202517248049e-94,
+      "kw_epsilon_sq": 0.046,
+      "sellthrough_range": 0.099,
+      "dominance_median": 0.622,
+      "min_topic_size": 542,
+      "max_topic_size": 4127,
+      "max_topic_share": 0.429,
+      "reconstruction_error": 95.0
+    },
+    {
+      "k": 7,
+      "silhouette_w": 0.231,
+      "kw_H": 612.4370680543453,
+      "kw_p": 4.8400499779239016e-129,
+      "kw_epsilon_sq": 0.063,
+      "sellthrough_range": 0.108,
+      "dominance_median": 0.586,
+      "min_topic_size": 400,
+      "max_topic_size": 2543,
+      "max_topic_share": 0.264,
+      "reconstruction_error": 94.686
+    },
+    {
+      "k": 8,
+      "silhouette_w": 0.219,
+      "kw_H": 548.4784884426765,
+      "kw_p": 2.9999910449579147e-114,
+      "kw_epsilon_sq": 0.056,
+      "sellthrough_range": 0.109,
+      "dominance_median": 0.557,
+      "min_topic_size": 395,
+      "max_topic_size": 2463,
+      "max_topic_share": 0.256,
+      "reconstruction_error": 94.382
+    }
+  ],
+  "topic_top_terms": {
+    "0": [
+      "brand=Polo_Ralph_Lauren",
+      "Polo_Ralph_Lauren|상의",
+      "brand=Levi's",
+      "brand=Adidas",
+      "Adidas|아우터",
+      "Levi's|하의",
+      "Polo_Ralph_Lauren|아우터",
+      "brand=Nike"
+    ],
+    "1": [
+      "brand=Supreme",
+      "brand=Stussy",
+      "Supreme|상의",
+      "brand=Nike",
+      "Nike|신발",
+      "Stussy|상의",
+      "Supreme|아우터",
+      "brand=Bape"
+    ],
+    "2": [
+      "brand=Japanese_Vintage",
+      "Japanese_Vintage|상의",
+      "brand=Vintage",
+      "Japanese_Vintage|아우터",
+      "Japanese_Vintage|치마",
+      "Vintage|상의",
+      "Japanese_Vintage|원피스",
+      "Japanese_Vintage|하의"
+    ],
+    "3": [
+      "brand=XLIM",
+      "XLIM|아우터",
+      "XLIM|하의",
+      "XLIM|상의",
+      "brand=Hatchingroom",
+      "brand=PLASTICPRODUCT",
+      "brand=Post_Archive_Faction",
+      "PLASTICPRODUCT|하의"
+    ],
+    "4": [
+      "brand=Stone_Island",
+      "Stone_Island|아우터",
+      "Stone_Island|상의",
+      "Stone_Island|하의",
+      "brand=C.P._Company",
+      "C.P._Company|아우터",
+      "Stone_Island|액세서리",
+      "Stone_Island|신발"
+    ],
+    "5": [
+      "brand=Chrome_Hearts",
+      "Chrome_Hearts|주얼리",
+      "Chrome_Hearts|액세서리",
+      "Chrome_Hearts|상의",
+      "Chrome_Hearts|모자",
+      "Chrome_Hearts|아우터",
+      "Chrome_Hearts|하의",
+      "brand=Balenciaga"
+    ],
+    "6": [
+      "brand=Maison_Margiela",
+      "brand=Prada",
+      "brand=Balenciaga",
+      "brand=Rick_Owens",
+      "brand=Our_Legacy",
+      "Prada|신발",
+      "Maison_Margiela|상의",
+      "brand=Lemaire"
+    ]
   },
   "archetype_profile": [
     {
       "archetype": 0,
-      "n_sellers": 2377,
-      "sell_through": 0.242,
-      "brand_hhi": 0.132,
-      "share_men": 0.206,
-      "share_new": 0.184,
-      "median_price": 70000.0,
-      "avg_n_photos": 4.649,
-      "top_brands": "Japanese Vintage, Stone Island, Vintage"
+      "n_sellers": 1366,
+      "sell_through": 0.144,
+      "dominance": 0.59,
+      "brand_hhi": 0.176,
+      "share_men": 0.819,
+      "share_new": 0.101,
+      "median_price": 75000.0,
+      "avg_n_photos": 5.721,
+      "top_terms": "brand=Polo_Ralph_Lauren, Polo_Ralph_Lauren|상의, brand=Levi's, brand=Adidas, Adidas|아우터, Levi's|하의"
     },
     {
       "archetype": 1,
-      "n_sellers": 6574,
-      "sell_through": 0.215,
-      "brand_hhi": 0.129,
-      "share_men": 0.936,
-      "share_new": 0.182,
-      "median_price": 142750.0,
-      "avg_n_photos": 4.671,
-      "top_brands": "Stone Island, Polo Ralph Lauren, Nike"
+      "n_sellers": 1663,
+      "sell_through": 0.206,
+      "dominance": 0.543,
+      "brand_hhi": 0.152,
+      "share_men": 0.856,
+      "share_new": 0.232,
+      "median_price": 120000.0,
+      "avg_n_photos": 4.351,
+      "top_terms": "brand=Supreme, brand=Stussy, Supreme|상의, brand=Nike, Nike|신발, Stussy|상의"
     },
     {
       "archetype": 2,
-      "n_sellers": 664,
-      "sell_through": 0.149,
-      "brand_hhi": 0.7,
-      "share_men": 0.744,
-      "share_new": 0.318,
-      "median_price": 150000.0,
-      "avg_n_photos": 5.201,
-      "top_brands": "Japanese Vintage, Stone Island, Polo Ralph Lauren"
+      "n_sellers": 1033,
+      "sell_through": 0.209,
+      "dominance": 0.612,
+      "brand_hhi": 0.222,
+      "share_men": 0.428,
+      "share_new": 0.156,
+      "median_price": 55000.0,
+      "avg_n_photos": 4.971,
+      "top_terms": "brand=Japanese_Vintage, Japanese_Vintage|상의, brand=Vintage, Japanese_Vintage|아우터, Japanese_Vintage|치마, Vintage|상의"
+    },
+    {
+      "archetype": 3,
+      "n_sellers": 968,
+      "sell_through": 0.251,
+      "dominance": 0.609,
+      "brand_hhi": 0.169,
+      "share_men": 0.911,
+      "share_new": 0.218,
+      "median_price": 130000.0,
+      "avg_n_photos": 3.325,
+      "top_terms": "brand=XLIM, XLIM|아우터, XLIM|하의, XLIM|상의, brand=Hatchingroom, brand=PLASTICPRODUCT"
+    },
+    {
+      "archetype": 4,
+      "n_sellers": 1642,
+      "sell_through": 0.22,
+      "dominance": 0.566,
+      "brand_hhi": 0.172,
+      "share_men": 0.603,
+      "share_new": 0.236,
+      "median_price": 92125.0,
+      "avg_n_photos": 4.449,
+      "top_terms": "brand=Stone_Island, Stone_Island|아우터, Stone_Island|상의, Stone_Island|하의, brand=C.P._Company, C.P._Company|아우터"
+    },
+    {
+      "archetype": 5,
+      "n_sellers": 400,
+      "sell_through": 0.229,
+      "dominance": 0.578,
+      "brand_hhi": 0.244,
+      "share_men": 0.909,
+      "share_new": 0.241,
+      "median_price": 339000.0,
+      "avg_n_photos": 4.545,
+      "top_terms": "brand=Chrome_Hearts, Chrome_Hearts|주얼리, Chrome_Hearts|액세서리, Chrome_Hearts|상의, Chrome_Hearts|모자, Chrome_Hearts|아우터"
+    },
+    {
+      "archetype": 6,
+      "n_sellers": 2543,
+      "sell_through": 0.25,
+      "dominance": 0.616,
+      "brand_hhi": 0.143,
+      "share_men": 0.753,
+      "share_new": 0.182,
+      "median_price": 197000.0,
+      "avg_n_photos": 4.986,
+      "top_terms": "brand=Maison_Margiela, brand=Prada, brand=Balenciaga, brand=Rick_Owens, brand=Our_Legacy, Prada|신발"
     }
   ],
   "kruskal": {
-    "H": 351.06,
-    "p": 5.858783467582833e-77
+    "H": 612.44,
+    "p": 4.8400499779239016e-129
   },
   "inference": {
-    "obs_silhouette": 0.287,
-    "null_silhouette_mean": 0.225,
-    "clusterability_p": 0.0196078431372549,
-    "kw_epsilon_sq": 0.036
+    "selected_method": "NMF",
+    "selected_k": 7,
+    "silhouette_w": 0.231,
+    "kw_epsilon_sq": 0.063,
+    "topic_dominance_median": 0.586,
+    "min_topic_size": 400,
+    "max_topic_size": 2543,
+    "max_topic_share": 0.264
   },
   "sellthrough_range_across_archetypes": [
-    0.149,
-    0.242
+    0.144,
+    0.251
   ],
   "benchmark_gap": {
     "0": {
       "n_photos": {
-        "top": 4.256,
-        "bottom": 4.97,
-        "gap": -0.714
+        "top": 5.349,
+        "bottom": 5.833,
+        "gap": -0.484
       },
       "desc_len": {
-        "top": 104.009,
-        "bottom": 172.403,
-        "gap": -68.393
+        "top": 167.621,
+        "bottom": 231.718,
+        "gap": -64.097
       },
       "kw_measure": {
-        "top": 0.42,
-        "bottom": 0.565,
-        "gap": -0.145
+        "top": 0.69,
+        "bottom": 0.857,
+        "gap": -0.167
       },
       "kw_flaw": {
-        "top": 0.163,
-        "bottom": 0.239,
-        "gap": -0.076
+        "top": 0.23,
+        "bottom": 0.389,
+        "gap": -0.159
       },
       "kw_material": {
-        "top": 0.246,
-        "bottom": 0.373,
-        "gap": -0.127
+        "top": 0.344,
+        "bottom": 0.42,
+        "gap": -0.077
       },
       "kw_usage": {
-        "top": 0.412,
-        "bottom": 0.368,
-        "gap": 0.045
+        "top": 0.339,
+        "bottom": 0.316,
+        "gap": 0.024
       },
       "relative_price_z": {
-        "top": -0.038,
-        "bottom": -0.172,
-        "gap": 0.134
+        "top": -0.072,
+        "bottom": -0.107,
+        "gap": 0.036
       }
     },
     "1": {
       "n_photos": {
-        "top": 4.37,
-        "bottom": 4.913,
-        "gap": -0.543
+        "top": 4.168,
+        "bottom": 4.42,
+        "gap": -0.252
       },
       "desc_len": {
-        "top": 114.501,
-        "bottom": 143.477,
-        "gap": -28.976
+        "top": 108.738,
+        "bottom": 105.742,
+        "gap": 2.996
       },
       "kw_measure": {
-        "top": 0.553,
-        "bottom": 0.644,
-        "gap": -0.091
+        "top": 0.516,
+        "bottom": 0.532,
+        "gap": -0.016
       },
       "kw_flaw": {
-        "top": 0.144,
-        "bottom": 0.228,
-        "gap": -0.083
+        "top": 0.151,
+        "bottom": 0.167,
+        "gap": -0.016
       },
       "kw_material": {
-        "top": 0.254,
-        "bottom": 0.296,
-        "gap": -0.042
+        "top": 0.228,
+        "bottom": 0.231,
+        "gap": -0.002
       },
       "kw_usage": {
-        "top": 0.341,
-        "bottom": 0.342,
-        "gap": -0.001
+        "top": 0.359,
+        "bottom": 0.329,
+        "gap": 0.031
       },
       "relative_price_z": {
-        "top": 0.037,
-        "bottom": 0.062,
-        "gap": -0.025
+        "top": 0.019,
+        "bottom": 0.108,
+        "gap": -0.089
       }
     },
     "2": {
       "n_photos": {
-        "top": 4.778,
-        "bottom": 5.494,
-        "gap": -0.716
+        "top": 4.643,
+        "bottom": 5.223,
+        "gap": -0.579
       },
       "desc_len": {
-        "top": 168.589,
-        "bottom": 227.818,
-        "gap": -59.229
+        "top": 133.354,
+        "bottom": 181.233,
+        "gap": -47.879
       },
       "kw_measure": {
-        "top": 0.459,
-        "bottom": 0.6,
-        "gap": -0.141
+        "top": 0.509,
+        "bottom": 0.627,
+        "gap": -0.119
       },
       "kw_flaw": {
-        "top": 0.162,
-        "bottom": 0.265,
-        "gap": -0.103
+        "top": 0.166,
+        "bottom": 0.238,
+        "gap": -0.071
       },
       "kw_material": {
-        "top": 0.303,
-        "bottom": 0.366,
-        "gap": -0.063
+        "top": 0.276,
+        "bottom": 0.361,
+        "gap": -0.084
       },
       "kw_usage": {
         "top": 0.33,
-        "bottom": 0.321,
-        "gap": 0.009
+        "bottom": 0.29,
+        "gap": 0.04
       },
       "relative_price_z": {
-        "top": 0.115,
-        "bottom": 0.171,
-        "gap": -0.056
+        "top": -0.083,
+        "bottom": -0.123,
+        "gap": 0.04
+      }
+    },
+    "3": {
+      "n_photos": {
+        "top": 3.248,
+        "bottom": 3.449,
+        "gap": -0.2
+      },
+      "desc_len": {
+        "top": 71.303,
+        "bottom": 74.584,
+        "gap": -3.281
+      },
+      "kw_measure": {
+        "top": 0.434,
+        "bottom": 0.48,
+        "gap": -0.046
+      },
+      "kw_flaw": {
+        "top": 0.188,
+        "bottom": 0.191,
+        "gap": -0.003
+      },
+      "kw_material": {
+        "top": 0.189,
+        "bottom": 0.206,
+        "gap": -0.017
+      },
+      "kw_usage": {
+        "top": 0.319,
+        "bottom": 0.319,
+        "gap": 0.0
+      },
+      "relative_price_z": {
+        "top": 0.005,
+        "bottom": 0.045,
+        "gap": -0.04
+      }
+    },
+    "4": {
+      "n_photos": {
+        "top": 4.179,
+        "bottom": 4.816,
+        "gap": -0.637
+      },
+      "desc_len": {
+        "top": 105.619,
+        "bottom": 166.091,
+        "gap": -60.472
+      },
+      "kw_measure": {
+        "top": 0.444,
+        "bottom": 0.517,
+        "gap": -0.074
+      },
+      "kw_flaw": {
+        "top": 0.141,
+        "bottom": 0.197,
+        "gap": -0.055
+      },
+      "kw_material": {
+        "top": 0.248,
+        "bottom": 0.317,
+        "gap": -0.069
+      },
+      "kw_usage": {
+        "top": 0.397,
+        "bottom": 0.367,
+        "gap": 0.03
+      },
+      "relative_price_z": {
+        "top": -0.005,
+        "bottom": 0.02,
+        "gap": -0.025
+      }
+    },
+    "5": {
+      "n_photos": {
+        "top": 4.34,
+        "bottom": 4.581,
+        "gap": -0.241
+      },
+      "desc_len": {
+        "top": 98.508,
+        "bottom": 115.478,
+        "gap": -16.97
+      },
+      "kw_measure": {
+        "top": 0.449,
+        "bottom": 0.443,
+        "gap": 0.007
+      },
+      "kw_flaw": {
+        "top": 0.094,
+        "bottom": 0.153,
+        "gap": -0.059
+      },
+      "kw_material": {
+        "top": 0.231,
+        "bottom": 0.247,
+        "gap": -0.016
+      },
+      "kw_usage": {
+        "top": 0.311,
+        "bottom": 0.324,
+        "gap": -0.013
+      },
+      "relative_price_z": {
+        "top": 0.134,
+        "bottom": 0.274,
+        "gap": -0.14
+      }
+    },
+    "6": {
+      "n_photos": {
+        "top": 4.691,
+        "bottom": 5.187,
+        "gap": -0.496
+      },
+      "desc_len": {
+        "top": 121.186,
+        "bottom": 148.95,
+        "gap": -27.764
+      },
+      "kw_measure": {
+        "top": 0.562,
+        "bottom": 0.63,
+        "gap": -0.068
+      },
+      "kw_flaw": {
+        "top": 0.133,
+        "bottom": 0.172,
+        "gap": -0.038
+      },
+      "kw_material": {
+        "top": 0.276,
+        "bottom": 0.318,
+        "gap": -0.042
+      },
+      "kw_usage": {
+        "top": 0.363,
+        "bottom": 0.383,
+        "gap": -0.02
+      },
+      "relative_price_z": {
+        "top": 0.044,
+        "bottom": 0.156,
+        "gap": -0.112
       }
     }
   },
-  "wishlist": {
-    "n_owners_mapped": 8830,
-    "wish_hhi_vs_sellthrough_corr": -0.095
-  }
+  "wish_sell_taste": {
+    "n_sellers_both": 5492,
+    "brand_map_coverage": 0.338,
+    "cosine_median": 0.283,
+    "cosine_mean": 0.373,
+    "frac_positive": 0.879,
+    "null_mean": 0.042,
+    "lift_over_null": 8.91,
+    "topic_n_sellers_both": 5492,
+    "topic_cosine_median": 0.793,
+    "topic_cosine_mean": 0.693,
+    "topic_null_mean": 0.378,
+    "topic_lift_over_null": 1.83
+  },
+  "wish_sell_taste_robustness": {
+    "full": {
+      "dims": 5439,
+      "median": 0.283,
+      "lift": 8.9
+    },
+    "bucket30": {
+      "dims": 31,
+      "median": 0.953,
+      "lift": 1.1
+    },
+    "top30": {
+      "dims": 30,
+      "median": 0.402,
+      "lift": 4.7
+    },
+    "top100": {
+      "dims": 100,
+      "median": 0.339,
+      "lift": 6.1
+    },
+    "idf": {
+      "dims": 5439,
+      "median": 0.222,
+      "lift": 13.3
+    },
+    "svd100": {
+      "dims": 100,
+      "median": 0.363,
+      "lift": 6.2
+    },
+    "drop_top10": {
+      "dims": 5429,
+      "median": 0.251,
+      "lift": 13.3
+    },
+    "drop_generic": {
+      "dims": 5437,
+      "median": 0.276,
+      "lift": 9.3
+    },
+    "brand_cat": {
+      "dims": 13599,
+      "median": 0.152,
+      "lift": 17.6
+    },
+    "low_listing_5_8": {
+      "n": 498,
+      "median": 0.216,
+      "lift": 10.8
+    }
+  },
+  "wish_brand_gini": 0.859
 }

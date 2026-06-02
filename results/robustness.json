@@ -48,10 +48,14 @@
     "full": 0.7863
   },
   "R4_cluster": {
-    "ari_mean": 1.0,
-    "specialist_archetype": 2,
-    "specialist_OR_controlled": 0.518,
-    "specialist_p_controlled": 0.0
+    "selected_method": "NMF",
+    "selected_config": "brand+brand_category_l2 tfidf, k=7",
+    "ari_mean": null,
+    "low_liquidity_archetype": 0,
+    "low_liquidity_sellthrough": 0.144,
+    "low_liquidity_OR_controlled": 0.468,
+    "low_liquidity_p_controlled": 0.0,
+    "topic_dominance_median": 0.586
   },
   "R5_p4": {
     "matchable_ge1_all": 0.983,

@@ -14,8 +14,29 @@
       "auc_std": 0.0017
     }
   },
+  "pr_auc": {
+    "controllable": 0.3301,
+    "structural": 0.4465,
+    "full": 0.481
+  },
   "logistic_controllable_auc": 0.6116,
   "auc_gap_full_minus_controllable": 0.163,
+  "time_split": {
+    "rule": "train < 2026, test = 2026",
+    "n_train": 122191,
+    "n_test": 162463,
+    "test_positive_rate": 0.2106,
+    "auc": {
+      "controllable": 0.6169,
+      "structural": 0.7457,
+      "full": 0.7724
+    },
+    "pr_auc": {
+      "controllable": 0.3163,
+      "structural": 0.3944,
+      "full": 0.441
+    }
+  },
   "inference": {
     "full_test_auc": 0.7881,
     "perm_p": 0.000999000999000999,
@@ -27,25 +48,47 @@
     "dAUC_full_minus_ctrl_CI95": [
       0.159,
       0.169
+    ],
+    "dAUC_full_minus_struct_CI95": [
+      0.017,
+      0.022
     ]
   },
   "contribution_share": {
-    "구조(아이템)": 0.871,
-    "통제가능(표현)": 0.129
+    "구조(아이템)": 0.884,
+    "통제가능(표현)": 0.116
   },
   "top_features": {
-    "brand_top_OTHER": 0.1213,
-    "category_l2_상의": 0.0203,
-    "log_price": 0.016,
-    "rel_price_missing": 0.0127,
-    "category_l2_주얼리": 0.0117,
-    "category_l2_액세서리": 0.0093,
-    "brand_top_Stone Island": 0.0088,
-    "relative_price_z": 0.0083,
-    "category_l2_라이프": 0.0071,
-    "brand_top_Vintage": 0.0056,
-    "desc_len": 0.0053,
-    "brand_top_Levi's": 0.0051
+    "brand_top_OTHER": 0.1314,
+    "category_l2_상의": 0.0235,
+    "log_price": 0.014,
+    "category_l2_주얼리": 0.0115,
+    "brand_top_Stone Island": 0.0097,
+    "rel_price_missing": 0.0095,
+    "category_l2_액세서리": 0.0094,
+    "relative_price_z": 0.0093,
+    "category_l2_라이프": 0.0073,
+    "brand_top_Levi's": 0.0063,
+    "brand_top_Vintage": 0.0051,
+    "n_photos": 0.0049
+  },
+  "shap_group_share": {
+    "구조(아이템)": 0.8169999718666077,
+    "통제가능(표현)": 0.18299999833106995
+  },
+  "shap_top_features": {
+    "brand_top_OTHER": 0.8589,
+    "category_l2_상의": 0.2388,
+    "log_price": 0.0889,
+    "relative_price_z": 0.0796,
+    "category_l2_액세서리": 0.0796,
+    "rel_price_missing": 0.0697,
+    "brand_top_Stone Island": 0.0663,
+    "kw_measure": 0.0574,
+    "n_photos": 0.057,
+    "brand_top_Levi's": 0.052,
+    "age_days": 0.051,
+    "category_l2_아우터": 0.0495
   },
   "controllable_auc_by_price_tier": {
     "1_low<3만": 0.6393,

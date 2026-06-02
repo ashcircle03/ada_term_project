@@ -11,12 +11,16 @@ data/raw_html/
 
 # 캐시 (재생성 가능)
 data/cache/
+.cache/
 
 # 로그
 logs/
 
 # Jupyter
 .ipynb_checkpoints/
+
+# Office 임시 잠금 파일
+~$*.docx
 
 # DB (190MB+, 크롤할 때마다 변경 → git 추적 제외. 로컬 보존/재크롤로 충분)
 data/fruitsfamily.db

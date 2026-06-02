@@ -66,6 +66,7 @@ def build_listing_features(raw: pd.DataFrame) -> pd.DataFrame:
                               labels=PRICE_TIER_LABELS, right=False)
     created = pd.to_datetime(df["created_at"], utc=True, errors="coerce")
     df["age_days"] = (TODAY - created).dt.total_seconds() / 86400.0
+    df["created_year"] = created.dt.year
     # brand top-K + OTHER (고카디널리티 6,765종 → 회귀용 축소)
     top_brands = df["brand"].value_counts().head(TOP_K_BRANDS).index
     df["brand_top"] = df["brand"].where(df["brand"].isin(top_brands), "OTHER")
@@ -81,7 +82,7 @@ def build_listing_features(raw: pd.DataFrame) -> pd.DataFrame:
     assert not leaked, f"누수 컬럼이 피처 테이블에 있음: {leaked}"
 
     keep = [
-        "product_id", "seller_id", "is_sold",
+        "product_id", "seller_id", "is_sold", "created_at", "created_year",
         # 통제가능(표현)
         "n_photos", "desc_len", "n_lines", "n_hashtag", "n_emoji", "has_desc",
         "kw_measure", "kw_flaw", "kw_material", "kw_purchase", "kw_usage", "kw_wash",
