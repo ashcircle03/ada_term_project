@@ -87,46 +87,5 @@
     "treated_sold": 0.18171970509235208,
     "control_sold": 0.20392620676695886,
     "caliper": 0.02
-  },
-  "cohort_robustness": {
-    "n": 39528,
-    "sold_rate": 0.217,
-    "photo_sellthrough": {
-      "full": {
-        "le2": 0.264,
-        "p3_5": 0.219,
-        "p6plus": 0.187
-      },
-      "cohort_365_730": {
-        "le2": 0.241,
-        "p3_5": 0.221,
-        "p6plus": 0.195
-      }
-    },
-    "or": {
-      "full": {
-        "photo": 0.945,
-        "desc": 0.97
-      },
-      "cohort_365_730": {
-        "photo": 0.984,
-        "desc": 0.98
-      }
-    }
-  },
-  "psm_sensitivity": {
-    "match_rate": 1.0,
-    "rr": 0.891,
-    "evalue": 1.49,
-    "smd_pre": {
-      "z_logprice": 0.07,
-      "z_age": 0.225,
-      "z_relprice": 0.123
-    },
-    "smd_post": {
-      "z_logprice": 0.015,
-      "z_age": 0.021,
-      "z_relprice": 0.01
-    }
   }
 }

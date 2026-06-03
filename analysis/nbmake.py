@@ -4,7 +4,7 @@
   '# %%'            → 코드 셀 시작
   '# %% [markdown]' → 마크다운 셀 시작 (이후 줄의 선행 '# ' 제거)
 
-사용:  python -m analysis.nbmake notebooks/00_eda.py
+사용:  python -m analysis.nbmake notebooks/00_report_eda.py
 """
 import sys
 from pathlib import Path

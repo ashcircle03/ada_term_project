@@ -1,51 +1,17 @@
 {
-  "premise_check": {
-    "sellthrough_by_within_group_price_bin": {
-      "하위25%(저가)": 19.2,
-      "25-50": 18.6,
-      "50-75": 18.1,
-      "상위25%(고가)": 19.9
-    },
-    "sold_vs_unsold_mean_pct": [
-      0.519,
-      0.509
-    ],
-    "conclusion": "동종군 내 가격위치는 sell-through를 예측하지 못함 → 단순 인하 전제 미지지",
-    "ref_overpriced_minus_fair_pp": 1.3
+  "group_definition": "brand × category_l1 × condition; valid group n>=5",
+  "n": 284654,
+  "n_with_valid_group": 258442,
+  "coverage_bcc_raw_condition": 0.908,
+  "sellthrough_by_within_group_price_bin": {
+    "하위25%(저가)": 0.192,
+    "25-50": 0.186,
+    "50-75": 0.181,
+    "상위25%(고가)": 0.199
   },
-  "sizing": [
-    {
-      "threshold_days": 60,
-      "aged_unsold_total": 146121,
-      "aged_in_group": 135686,
-      "over_median_pct": 0.499,
-      "over_p75_pct": 0.27,
-      "markdown_to_median_pct_median": 37.5,
-      "has_heart_pct": 0.928,
-      "ge_median_heart_pct": 0.586
-    },
-    {
-      "threshold_days": 90,
-      "aged_unsold_total": 123311,
-      "aged_in_group": 113897,
-      "over_median_pct": 0.494,
-      "over_p75_pct": 0.266,
-      "markdown_to_median_pct_median": 37.5,
-      "has_heart_pct": 0.93,
-      "ge_median_heart_pct": 0.594
-    }
+  "sold_vs_unsold_mean_pct": [
+    0.519,
+    0.509
   ],
-  "stage_split_90d": {
-    "B.충분노출+미판매(→가격/오퍼)": 0.744,
-    "A.저노출(→P4매칭)": 0.256
-  },
-  "ab_design": {
-    "armA_price_experiment": "90일+ stageB 과가 → 동종중앙값까지 인하 제안, 30일 전환 측정",
-    "armB_offer_to_wishers": "찜 보유 묵은매물 → 찜한 사람에 비공개 오퍼, 수락→거래 측정",
-    "guardrails": [
-      "셀러 이탈",
-      "평균 판매가/마진",
-      "인기매물 노출 잠식"
-    ]
-  }
+  "conclusion": "현재의 브랜드·대분류·컨디션 기준 동종 가격 위치는 전환율을 거의 가르지 못한다. 따라서 가격군은 판매 확률 처방이 아니라 시세 불확실성 완화 정보로 해석한다."
 }
