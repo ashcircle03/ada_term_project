@@ -12,8 +12,9 @@
   - `02_report_h2_structural_signals.*`: 구조 변수와 표현 변수의 예측 신호 비교
   - `03_report_h3_wishlist_onboarding.*`: 위시리스트 기반 취향 정렬과 초기 안내 가설
 - `results/`: 보고서에 인용한 JSON 결과와 그림
+- `data/README.md`: 원자료·캐시 생성 위치 안내
 
-`archive/`, `data/`, `AGENTS.md`, `REPORT.md`, dot-prefixed 로컬 경로는 제출용 GitHub ZIP에서 제외합니다. `REPORT.md`는 로컬 보고서 초안이며, 최종 보고서는 별도 파일로 제출합니다.
+`archive/`, `AGENTS.md`, `REPORT.md`, dot-prefixed 로컬 경로는 제출용 GitHub ZIP에서 제외합니다. `data/` 경로는 포함하되 실제 DB, raw HTML, parquet 캐시는 제외합니다. `REPORT.md`는 로컬 보고서 초안이며, 최종 보고서는 별도 파일로 제출합니다.
 
 ## Environment
 

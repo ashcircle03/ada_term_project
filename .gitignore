@@ -3,7 +3,6 @@ archive/
 AGENTS.md
 REPORT.md
 REPORT*.txt
-data/
 
 # dot-prefixed 로컬 경로
 .*
@@ -16,6 +15,10 @@ __pycache__/
 .DS_Store
 
 *.key
+
+# data/ 경로는 README만 제출 ZIP에 포함하고, 원자료·캐시는 제외
+data/*
+!data/README.md
 
 # 크롤링 raw HTML (336MB, 너무 큼)
 data/raw_html/
