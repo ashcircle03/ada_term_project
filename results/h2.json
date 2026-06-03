@@ -37,6 +37,38 @@
       "full": 0.441
     }
   },
+  "brand_capacity_robustness": {
+    "split": "train < 2026, test = 2026",
+    "controllable_oot_auc": 0.6169,
+    "controllable_oot_pr_auc": 0.3163,
+    "variants": {
+      "struct_no_brand": {
+        "n_features": 24,
+        "oot_auc": 0.5824,
+        "oot_pr_auc": 0.2642
+      },
+      "struct_brand_top5": {
+        "n_features": 29,
+        "oot_auc": 0.6573,
+        "oot_pr_auc": 0.3151
+      },
+      "struct_brand_top10": {
+        "n_features": 34,
+        "oot_auc": 0.6935,
+        "oot_pr_auc": 0.3355
+      },
+      "struct_brand_top20": {
+        "n_features": 44,
+        "oot_auc": 0.7267,
+        "oot_pr_auc": 0.3709
+      },
+      "struct_full_existing": {
+        "n_features": 54,
+        "oot_auc": 0.7457,
+        "oot_pr_auc": 0.3944
+      }
+    }
+  },
   "auc_decomp": {
     "controllable": 0.6244,
     "item(no age)": 0.7653,

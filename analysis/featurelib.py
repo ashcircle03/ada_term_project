@@ -3,7 +3,7 @@
 build_features.py(캐시 생성)와 노트북들이 공통으로 import한다.
 SQL은 build_features.py에만, 여기서는 DataFrame만 다룬다.
 
-설계 결정 (계획서 근거):
+설계 결정:
   - 결과변수는 is_sold (유동성/매칭). 속도 아님.
   - gender(MEN/WOMEN)는 category_l1(남자/여자)과 사실상 동일 → 공선성 회피 위해
     구조 통제에는 category_l1만 사용, gender는 제외.

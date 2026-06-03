@@ -1,23 +1,27 @@
 # %% [markdown]
-# # 02 · H2 · 셀러 통제요인과 구조적 요인 중 무엇이 판매를 가르나 (지도학습)
+# # 02 · H2 · 현재 표본에서 구조 변수는 표현 변수보다 큰 예측 신호를 내는가 (지도학습)
 #
-# **가설.** 판매 전환은 셀러가 *바꿀 수 있는* 표현(사진·설명·상대가격)보다 *못 바꾸는*
-# 구조(브랜드 수요·가격대·카테고리)에 더 좌우된다. 따라서 일반 가이드는 "노력→판매"를
-# 과대포장할 수 있고, 신규 셀러에게는 매물 구조에 맞는 기준점이 더 중요할 수 있다.
+# **가설.** 현재 수집 표본과 피처 구성에서 판매 전환은 셀러가 등록 화면에서 바꿀 수 있는
+# 표현 요소(사진·설명·상대가격)보다 브랜드·가격대·카테고리 같은 매물 구조와 더 강하게
+# 연관될 수 있다. 이 분석은 플랫폼 전체의 보편 법칙을 증명하기보다, 신규 셀러 안내에서
+# 어떤 정보군을 먼저 기준점으로 삼아야 하는지 비교한다.
 #
 # **왜 이 방법인가.** 비선형·상호작용이 많은 자료에서 *예측 가능성의 상한*을 재기 위해
 # 유연한 **그래디언트 부스팅**을 학습한다. 성능은 임의로 고른 팔린 매물과 안 팔린 매물 중
 # 모형이 팔린 쪽에 더 높은 점수를 줄 확률, 곧 둘을 얼마나 잘 구분하는지를 0.5(무작위)~1(완벽)
-# 로 나타내는 **AUC**로 측정한다. 표현 변수만 넣은 모형과 구조 변수만 넣은 모형의 AUC 격차가
-# 셀러가 통제할 수 있는 여지의 상대적 한계를 보여준다. 등록 후 누적되는 조회·찜 수는 결과를 미리
+# 로 나타내는 **AUC**로 측정하고, 불균형 자료의 정밀도 한계를 보기 위해 **PR-AUC**를 함께
+# 보고한다. 표현 변수만 넣은 모형과 구조 변수만 넣은 모형의 AUC 격차가
+# 셀러가 통제할 수 있는 여지의 상대적 한계를 보여준다. 이 값은 운영 예측기 성능이 아니라
+# 변수군 비교 지표다. 등록 후 누적되는 조회·찜 수는 결과를 미리
 # 반영하는 **누수** 변수라 예측에서 제외한다. 비교 대상은 표현 변수만 넣은 모형, 구조 변수만 넣은 모형,
 # 그리고 두 변수군을 함께 넣은 전체 모형이다.
 #
-# **유의성(2c절).** 모수적 검정이 없으므로 재표집으로 귀무를 기각한다. 라벨 순열검정으로
+# **유의성(2d절).** 모수적 검정이 없으므로 재표집으로 귀무를 기각한다. 라벨 순열검정으로
 # "AUC=0.5(우연)"을, 부트스트랩 신뢰구간으로 "두 모형의 AUC 차=0"을. 유의수준 α=0.05.
 #
-# **구성:** (1) 피처군 정의, (2) AUC 비교, (2a) out-of-time 검증, (2b) 시간 효과 분해,
-# (2c) 순열·부트스트랩 검정, (3) 순열 중요도와 Tree SHAP 보조 해석. 산출 수치는 results/h2.json.
+# **구성:** (1) 피처군 정의, (2) AUC 비교, (2a) out-of-time 검증,
+# (2b) 브랜드 자유도 점검, (2c) 시간 효과 분해, (2d) 순열·부트스트랩 검정,
+# (3) 순열 중요도와 Tree SHAP 보조 해석. 산출 수치는 results/h2.json.
 
 # %%
 import json
@@ -31,7 +35,7 @@ import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from sklearn.model_selection import cross_val_score, train_test_split, StratifiedKFold
+from sklearn.model_selection import cross_val_score, cross_validate, train_test_split, StratifiedKFold
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
@@ -45,6 +49,11 @@ matplotlib.rcParams["font.family"] = "AppleGothic"
 matplotlib.rcParams["axes.unicode_minus"] = False
 plt.rcParams["figure.dpi"] = 110
 FIG = ROOT / "results" / "figures"
+CV_N_JOBS = int(os.environ.get("ADA_CV_N_JOBS", "1"))
+XGB_N_JOBS = int(os.environ.get("ADA_XGB_N_JOBS", "-1" if CV_N_JOBS == 1 else "1"))
+PERM_N_JOBS = int(os.environ.get("ADA_PERM_N_JOBS", "-1"))
+PERM_B = int(os.environ.get("ADA_PERM_B", "1000"))
+BOOT_B = int(os.environ.get("ADA_BOOT_B", "1000"))
 
 lst = pd.read_parquet(ROOT / "data" / "cache" / "features_listing.parquet")
 lst["rel_price_missing"] = lst["relative_price_z"].isna().astype(int)
@@ -70,6 +79,11 @@ STRUCT_CAT = ["brand_top", "category_l1", "category_l2", "condition"]
 
 assert not ({"view_count", "like_count", "likes"} & set(lst.columns)), "누수 컬럼 존재!"
 
+
+def one_hot(series, prefix):
+    return pd.get_dummies(series, prefix=prefix, drop_first=True).astype(float)
+
+
 # category_l2 고카디널리티 → top20 + OTHER
 top_l2 = lst["category_l2"].value_counts().head(20).index
 lst["category_l2"] = lst["category_l2"].where(lst["category_l2"].isin(top_l2), "OTHER")
@@ -81,7 +95,7 @@ def make_X(which):
     if which in ("structural", "full"):
         parts.append(lst[STRUCT_NUM].astype(float))
         for c in STRUCT_CAT:
-            parts.append(pd.get_dummies(lst[c], prefix=c, drop_first=True).astype(float))
+            parts.append(one_hot(lst[c], c))
     return pd.concat(parts, axis=1)
 
 X_ctrl, X_struct, X_full = make_X("controllable"), make_X("structural"), make_X("full")
@@ -91,36 +105,42 @@ print("dims:", X_ctrl.shape[1], X_struct.shape[1], X_full.shape[1])
 # ### 피처군 분류 근거 (H2의 조작적 핵심)
 #
 # 두 군의 경계는 **"셀러가 등록 시점에 바꿀 수 있는가"** 라는 조작적 정의다. 사진·설명·키워드·할인/
-# 상대가격은 *통제가능(표현)*, 브랜드·카테고리·컨디션·가격은 사실상 고정된 *매물 구조*. 이 분할 자체가 H2의
+# 상대가격은 *통제가능(표현)*, 브랜드·카테고리·컨디션·원가격은 사실상 고정된 *매물 구조*. 이 분할 자체가 H2의
 # 검정 대상이라 명시적으로 고정한다. **누수 가드**: 조회·찜 수는 등록 *이후* 누적되는 사후 변수라 결과를 미리
 # 반영(누수)하므로 두 군 모두에서 제외한다(피처 테이블에 부재, 위 assert로 재확인). 고카디널리티
 # `brand_top`(상위30+기타)·`category_l2`(상위20+기타)는 더미 폭발·과적합을 막는 축약이며, 뒤에서
 # `brand_top_OTHER`(비주류 브랜드)가 최상위 피처로 나오는 것은 '무명일수록 안 팔린다'는 구조 신호로 읽는다.
+# 다만 `relative_price_z`는 원가격에서 파생된 값이므로 표현군과 구조군이 완전히 독립적인 것은 아니다.
 # `age_days`는 절단을 분리하려 구조군에 두되 'age만'의 AUC를 따로 재 시간 효과와 구분한다. 모델은 비선형·
-# 상호작용 상한을 재기 위해 XGBoost를, 성능은 불균형에 견고한 순위 지표 AUC를 쓴다.
+# 상호작용 상한을 재기 위해 XGBoost를, 성능은 AUC와 PR-AUC를 함께 쓴다.
 
 # %% [markdown]
 # ## 2. AUC 비교. 셀러 통제력의 상한
 #
 # 통제가능-only AUC가 0.5(무작위)에 가까울수록 셀러가 움직일 수 있는 레버만으로는 판매를
-# 거의 예측하지 못한다는 뜻이다. 구조 변수만의 AUC가 표현 변수만의 AUC보다 높으면
-# '무엇을 파는가'의 신호가 표현 노력보다 크다고 해석한다.
+# 제한적으로만 구분한다는 뜻이다. 구조 변수만의 AUC가 표현 변수만의 AUC보다 높으면
+# 현재 표본에서 '무엇을 파는가'의 신호가 표현 노력보다 크다고 해석한다. PR-AUC는 양성률
+# 0.215를 기준선으로 보아, 모델이 운영 자동선별기로 충분한지보다 변수군 비교가 어느 정도
+# 불균형 자료에서도 유지되는지를 확인하는 보조 지표로 사용한다.
 
 # %%
 cv = StratifiedKFold(5, shuffle=True, random_state=42)
 def xgb():
     return XGBClassifier(n_estimators=300, max_depth=5, learning_rate=0.1,
                          subsample=0.8, colsample_bytree=0.8, tree_method="hist",
-                         eval_metric="logloss", n_jobs=-1, random_state=42)
+                         eval_metric="logloss", n_jobs=XGB_N_JOBS, random_state=42)
 
 # 하이퍼파라미터는 최적 성능을 찾기 위한 튜닝값이 아니라 변수군 비교를 같은 조건에서 수행하기 위한
 # 고정 사양이다. 중간 깊이(max_depth=5), shrinkage(learning_rate=0.1), 행·열 subsampling(0.8)을
-# 사용해 과적합을 줄이고, 모든 변수군에 같은 설정을 적용해 AUC 차이를 피처군 차이로 해석한다.
+# 사용해 과적합을 줄이고, 모든 변수군에 같은 설정을 적용해 AUC 차이를 피처군 차이로 비교한다.
+# 구조군은 고카디널리티 범주형을 포함하므로, 뒤의 브랜드 자유도 축약 검사를 함께 보아야 한다.
 
 auc = {}; pr_auc = {}
+scoring = {"roc_auc": "roc_auc", "average_precision": "average_precision"}
 for name, X in [("controllable", X_ctrl), ("structural", X_struct), ("full", X_full)]:
-    s = cross_val_score(xgb(), X, y, cv=cv, scoring="roc_auc", n_jobs=1)
-    pr = cross_val_score(xgb(), X, y, cv=cv, scoring="average_precision", n_jobs=1)  # PR-AUC(불균형 보완)
+    scores = cross_validate(xgb(), X, y, cv=cv, scoring=scoring, n_jobs=CV_N_JOBS)
+    s = scores["test_roc_auc"]
+    pr = scores["test_average_precision"]  # PR-AUC(불균형 보완)
     auc[name] = {"auc_mean": round(s.mean(), 4), "auc_std": round(s.std(), 4)}
     pr_auc[name] = round(float(pr.mean()), 4)
     print(f"  {name:12s} AUC = {s.mean():.4f} ± {s.std():.4f} | PR-AUC = {pr.mean():.4f}")
@@ -129,7 +149,7 @@ print(f"  (baseline PR-AUC = 양성률 {y.mean():.3f}; ROC-AUC는 임계 무관 
 # 로지스틱 baseline (통제가능-only)
 log_auc = cross_val_score(
     make_pipeline(StandardScaler(), LogisticRegression(max_iter=500)),
-    X_ctrl, y, cv=cv, scoring="roc_auc").mean()
+    X_ctrl, y, cv=cv, scoring="roc_auc", n_jobs=CV_N_JOBS).mean()
 print(f"  (logistic controllable-only AUC = {log_auc:.4f})")
 
 # %% [markdown]
@@ -175,7 +195,71 @@ time_split = {
 }
 
 # %% [markdown]
-# ## 2b. 시간 효과 분해
+# ## 2b. 브랜드 자유도 의존성 점검
+#
+# 구조군 우위가 고카디널리티 브랜드 더미의 표현 용량만으로 생긴 것인지 확인한다. 브랜드를
+# 완전히 제거한 구조군과, 브랜드를 상위 5/10/20개 + 기타로 강하게 축약한 구조군을 같은
+# out-of-time split에서 비교한다. 이 검사는 구조 우위의 외적 일반화가 브랜드 표집과 인코딩에
+# 민감하다는 점을 확인하기 위한 보조 분석이다.
+
+# %%
+def make_structural_variant(brand_limit="full"):
+    parts = [lst[STRUCT_NUM].astype(float)]
+    cat_series = {
+        "category_l1": lst["category_l1"],
+        "category_l2": lst["category_l2"],
+        "condition": lst["condition"],
+    }
+    if brand_limit == "full":
+        cat_series = {"brand_top": lst["brand_top"], **cat_series}
+    elif brand_limit is not None:
+        top_brands = (
+            lst.loc[lst["brand_top"].ne("OTHER"), "brand_top"]
+            .value_counts()
+            .head(int(brand_limit))
+            .index
+        )
+        brand_limited = lst["brand_top"].where(lst["brand_top"].isin(top_brands), "OTHER")
+        cat_series = {f"brand_top{brand_limit}": brand_limited, **cat_series}
+    for c, s in cat_series.items():
+        parts.append(one_hot(s, c))
+    return pd.concat(parts, axis=1)
+
+
+brand_capacity_sets = {
+    "struct_no_brand": make_structural_variant(None),
+    "struct_brand_top5": make_structural_variant(5),
+    "struct_brand_top10": make_structural_variant(10),
+    "struct_brand_top20": make_structural_variant(20),
+    "struct_full_existing": X_struct,
+}
+brand_capacity = {
+    "split": time_rule,
+    "controllable_oot_auc": time_auc["controllable"],
+    "controllable_oot_pr_auc": time_pr_auc["controllable"],
+    "variants": {},
+}
+print("브랜드 자유도 축약 점검:")
+print(
+    f"  controllable      dims={X_ctrl.shape[1]:2d} "
+    f"OOT AUC={time_auc['controllable']:.4f} | PR-AUC={time_pr_auc['controllable']:.4f}"
+)
+for name, X in brand_capacity_sets.items():
+    m = xgb().fit(X.iloc[time_tr], y[time_tr])
+    p = m.predict_proba(X.iloc[time_te])[:, 1]
+    record = {
+        "n_features": int(X.shape[1]),
+        "oot_auc": round(float(roc_auc_score(y[time_te], p)), 4),
+        "oot_pr_auc": round(float(average_precision_score(y[time_te], p)), 4),
+    }
+    brand_capacity["variants"][name] = record
+    print(
+        f"  {name:18s} dims={record['n_features']:2d} "
+        f"OOT AUC={record['oot_auc']:.4f} | PR-AUC={record['oot_pr_auc']:.4f}"
+    )
+
+# %% [markdown]
+# ## 2c. 시간 효과 분해
 #
 # 구조 변수의 우위가 단순히 오래 노출된 매물이 더 팔렸기 때문인지 확인한다. `age_days`만으로
 # 예측한 AUC가 낮고, age를 제외한 아이템 구조 모형이 높은 AUC를 유지하면 구조 우위는 시간의
@@ -184,10 +268,10 @@ time_split = {
 # %%
 STRUCT_ITEM = pd.concat([
     lst[["log_price"]].astype(float),
-    pd.get_dummies(lst.brand_top, prefix="b", drop_first=True),
-    pd.get_dummies(lst.category_l1, prefix="c1", drop_first=True),
-    pd.get_dummies(lst.category_l2, prefix="c2", drop_first=True),
-    pd.get_dummies(lst.condition, prefix="cond", drop_first=True),
+    one_hot(lst.brand_top, "b"),
+    one_hot(lst.category_l1, "c1"),
+    one_hot(lst.category_l2, "c2"),
+    one_hot(lst.condition, "cond"),
 ], axis=1).astype(float)
 AGE = lst[["age_days"]].astype(float)
 
@@ -200,7 +284,7 @@ def xgb_decomp():
         colsample_bytree=0.8,
         tree_method="hist",
         eval_metric="logloss",
-        n_jobs=-1,
+        n_jobs=XGB_N_JOBS,
         random_state=42,
     )
 
@@ -212,7 +296,7 @@ auc_decomp_sets = {
     "full": X_full,
 }
 auc_decomp = {
-    k: round(float(cross_val_score(xgb_decomp(), X, y, cv=cv, scoring="roc_auc", n_jobs=1).mean()), 4)
+    k: round(float(cross_val_score(xgb_decomp(), X, y, cv=cv, scoring="roc_auc", n_jobs=CV_N_JOBS).mean()), 4)
     for k, X in auc_decomp_sets.items()
 }
 print("AUC 분해:")
@@ -232,7 +316,7 @@ fig.savefig(FIG / "r3_auc_decomp.png", bbox_inches="tight")
 plt.close(fig)
 
 # %% [markdown]
-# ## 2c. 추론. 귀무가설 기각
+# ## 2d. 추론. 귀무가설 기각
 #
 # 지도학습엔 모수적 t-검정이 없으므로, 분포 가정 없이 **재표집/순열**로 검정한다.
 # (i) **라벨 순열검정**: y를 무작위로 섞어 만든 null AUC 분포와 관측 AUC를 비교 →
@@ -248,12 +332,12 @@ def fit_pred(X):
 p_ctrl, p_str, p_full = fit_pred(X_ctrl), fit_pred(X_struct), fit_pred(X_full)
 obs_full = roc_auc_score(yte_, p_full)
 
-rng = np.random.RandomState(1); B = 1000
+rng = np.random.RandomState(1); B = PERM_B
 null_auc = np.array([roc_auc_score(rng.permutation(yte_), p_full) for _ in range(B)])
 perm_p = (1 + np.sum(null_auc >= obs_full)) / (B + 1)
 print(f"  full AUC(test)={obs_full:.4f} | 순열 null {null_auc.mean():.3f}±{null_auc.std():.3f} | p={perm_p:.4f}")
 
-def boot_dauc(pa, pb, B=1000):
+def boot_dauc(pa, pb, B=BOOT_B):
     n = len(yte_); d = np.empty(B)
     for b in range(B):
         s = rng.randint(0, n, n)
@@ -282,7 +366,7 @@ print("holdout AUC:", round(roc_auc_score(yte, clf.predict_proba(Xte)[:, 1]), 4)
 # 속도 위해 holdout 일부로 permutation
 idx = np.random.RandomState(0).choice(len(Xte), size=min(10000, len(Xte)), replace=False)
 perm = permutation_importance(clf, Xte.iloc[idx], yte[idx], scoring="roc_auc",
-                              n_repeats=3, random_state=0, n_jobs=1)
+                              n_repeats=3, random_state=0, n_jobs=PERM_N_JOBS)
 imp = pd.Series(perm.importances_mean, index=X_full.columns).sort_values(ascending=False)
 
 def group_of(col):
@@ -339,6 +423,7 @@ h2 = {
     "logistic_controllable_auc": round(float(log_auc), 4),
     "auc_gap_full_minus_controllable": round(auc["full"]["auc_mean"] - auc["controllable"]["auc_mean"], 4),
     "time_split": time_split,
+    "brand_capacity_robustness": brand_capacity,
     "auc_decomp": auc_decomp,
     "inference": H2_INF,
     "contribution_share": {k: float(v) for k, v in grp_share.items()},

@@ -1,3 +1,14 @@
+# 제출 ZIP 제외 경로
+archive/
+AGENTS.md
+REPORT.md
+REPORT*.txt
+data/
+
+# dot-prefixed 로컬 경로
+.*
+!.gitignore
+
 # 환경
 .conda/
 __pycache__/

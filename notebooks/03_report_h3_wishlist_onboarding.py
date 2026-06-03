@@ -3,13 +3,15 @@
 #
 # **가설.** 셀러를 선명한 군집으로 나누기보다, 브랜드와 하위 카테고리 조합에서 반복되는
 # 취향 토픽을 추정하면 판매 전환 차이를 더 해석 가능하게 설명할 수 있다. 이 토픽은 신규
-# 셀러에게 유사 참조군을 찾는 보조 신호가 된다.
+# 셀러에게 유사 참조군을 찾는 후보 신호가 된다. 단 위시리스트의 찜 시각이 없으므로,
+# 이 노트북은 콜드스타트를 해결했다고 주장하지 않고 내부 실험으로 검증할 초기 안내 가설을 만든다.
 #
 # **방법.** 매물 5건 이상 셀러의 `brand`와 `brand|category_l2` 토큰을 셀러별 sparse vector로
 # 만들고, TF-IDF 변환 뒤 NMF를 적합한다. 토픽 수 선택 규칙에는 판매 전환율을 사용하지 않는다.
 # 각 셀러는 가장 큰 topic weight의 토픽으로 요약하되,
 # dominance를 함께 저장해 혼합 취향 셀러가 많다는 점을 드러낸다. 결과변수 `sell_through`는
-# 토픽 학습 피처에서 제외하고 사후 검정에만 사용한다.
+# 토픽 학습 피처에서 제외하고 사후 검정에만 사용한다. leave-one-out 검증은 실제 신규 셀러가
+# 아니라 위시와 셀링을 모두 가진 기존 셀러를 프록시로 쓰므로, 적용 범위는 별도 위시 보유율로 확인한다.
 #
 # 산출은 `results/h3.json`, `data/cache/seller_clusters.parquet`, H3 관련 그림이다.
 
@@ -53,24 +55,37 @@ print(f"전체 셀러 {len(sel):,} → 토픽 대상(매물5+) {len(sel_c):,} ({
 
 # %% [markdown]
 # ## 1. 브랜드×하위카테고리 NMF 토픽
+#
+# 빈티지 셀러의 취향은 하나의 배타적 집단보다 여러 브랜드·카테고리 묶음의 조합에
+# 가깝다. 비음수 토픽 가중치로 한 셀러가 여러 취향을 얼마나 섞어 갖는지 표현하고,
+# 각 토픽은 상위 브랜드로 해석한다. 토픽 수는
+# 전환율을 보지 않는 균형·주도성 기준으로만 정해 결과 누수를 막는다.
 
 # %%
-def _safe_token(x):
-    if pd.isna(x):
-        return "UNK"
-    return str(x).strip().replace(" ", "_")[:80]
+def _safe_token_series(s):
+    return s.fillna("UNK").astype(str).str.strip().str.replace(" ", "_", regex=False).str.slice(0, 80)
+
+
+def _token_dicts(frame, id_col, brand_col="brand", category_col="category_l2"):
+    base = frame[[id_col, brand_col, category_col]].copy()
+    brand = _safe_token_series(base[brand_col])
+    cat2 = _safe_token_series(base[category_col])
+    long = pd.concat(
+        [
+            pd.DataFrame({id_col: base[id_col].values, "token": "brand=" + brand}),
+            pd.DataFrame({id_col: base[id_col].values, "token": brand + "|" + cat2}),
+        ],
+        ignore_index=True,
+    )
+    counts = long.groupby([id_col, "token"], sort=True).size().rename("n").reset_index()
+    return [
+        (sid, dict(zip(g["token"], g["n"])))
+        for sid, g in counts.groupby(id_col, sort=True)
+    ]
 
 
 def _seller_token_dicts(listings):
-    rows = []
-    for sid, g in listings.groupby("seller_id"):
-        d = {}
-        for _, r in g.iterrows():
-            brand = _safe_token(r["brand"])
-            cat2 = _safe_token(r["category_l2"])
-            for tok in (f"brand={brand}", f"{brand}|{cat2}"):
-                d[tok] = d.get(tok, 0) + 1
-        rows.append((sid, d))
+    rows = _token_dicts(listings, "seller_id")
     seller_ids = [r[0] for r in rows]
     vec = DictVectorizer(dtype=float)
     counts = vec.fit_transform([r[1] for r in rows])
@@ -287,15 +302,7 @@ product_meta = lst.set_index("product_id")[["brand", "category_l2"]]
 wl_topic = wl.join(product_meta, on="product_id", rsuffix="_mapped").dropna(subset=["brand_mapped"])
 
 def _wish_topic_dicts(wish_rows):
-    rows = []
-    for oid, g in wish_rows.groupby("owner_seller_id"):
-        d = {}
-        for _, r in g.iterrows():
-            brand = _safe_token(r["brand_mapped"])
-            cat2 = _safe_token(r["category_l2"])
-            for tok in (f"brand={brand}", f"{brand}|{cat2}"):
-                d[tok] = d.get(tok, 0) + 1
-        rows.append((oid, d))
+    rows = _token_dicts(wish_rows, "owner_seller_id", brand_col="brand_mapped")
     ids = [r[0] for r in rows]
     Xc = topic_vectorizer.transform([r[1] for r in rows])
     Xt = topic_tfidf.transform(Xc)
@@ -331,12 +338,54 @@ WST.update({
 })
 
 # %% [markdown]
-# ## 4. 위시 기반 참조군 검색 PoC
+# ## 4. 신규·저이력 셀러의 위시 신호 보유율
+#
+# 위시 기반 참조군은 실제 신규 셀러에게 위시리스트가 있어야 적용할 수 있다. leave-one-out
+# 검증 대상은 위시와 셀링을 모두 가진 기존 셀러이므로, 별도로 판매 0건과 저이력 셀러의
+# 브랜드 매핑 가능 위시 수를 확인한다. 위시가 부족한 매우 초기 셀러에게는 온보딩 취향 입력이
+# 보완 신호가 되어야 한다.
+
+# %%
+seller_wish = sel[["seller_id", "n_listings", "n_sold"]].set_index("seller_id").copy()
+seller_wish["brand_mapped_wishes"] = (
+    w_tot.reindex(seller_wish.index).fillna(0).astype(int)
+)
+
+
+def _wishlist_availability(mask):
+    g = seller_wish.loc[mask].copy()
+    w = g["brand_mapped_wishes"]
+    return {
+        "n_sellers": int(len(g)),
+        "any_wish_rate": round(float((w >= 1).mean()), 3),
+        "ge5_wish_rate": round(float((w >= 5).mean()), 3),
+        "wish_count_median": round(float(w.median()), 1),
+        "wish_count_p75": round(float(w.quantile(0.75)), 1),
+        "wish_count_p90": round(float(w.quantile(0.90)), 1),
+    }
+
+
+low_history_wishlist = {
+    "sold_eq0": _wishlist_availability(seller_wish["n_sold"] == 0),
+    "sold_le2": _wishlist_availability(seller_wish["n_sold"] <= 2),
+    "listings_le2": _wishlist_availability(seller_wish["n_listings"] <= 2),
+}
+print("신규·저이력 셀러 위시 보유율:")
+for k, v in low_history_wishlist.items():
+    print(
+        f"  {k:12s} n={v['n_sellers']:,} | any={v['any_wish_rate']:.1%} "
+        f"| >=5={v['ge5_wish_rate']:.1%} | median={v['wish_count_median']:.1f}"
+    )
+
+# %% [markdown]
+# ## 5. 위시 기반 참조군 검색 PoC
 #
 # 신규 셀러의 실제 미래 판매는 단면 자료로 관측할 수 없다. 따라서 위시와 셀링을 모두 가진
 # 기존 셀러를 신규처럼 취급해 셀링을 가리고, 위시 벡터만으로 유사한 기존 셀러를 찾는다.
 # 검색 결과의 실제 셀링 취향이 본인 셀링과 가까운지, 그리고 전환율 상위 1/3 참조 셀러가
-# 도달 가능한지를 본다.
+# 도달 가능한지를 본다. 다만 상위 1/3 셀러를 30명 안에 1명 이상 포함하는 도달률은 무작위
+# 기준에서도 거의 100%에 가까우므로 성과 지표가 아니다. 핵심 검증은 검색 이웃의 실제 셀링
+# 취향이 무작위 이웃보다 얼마나 가까운지다.
 
 # %%
 def hhi(s):
@@ -419,11 +468,11 @@ onboarding_poc = {
 }
 
 # %% [markdown]
-# ## 5. 가격군 보조 검증
+# ## 6. 가격군 보조 검증
 #
-# 가격군은 신규 셀러의 시세 불확실성을 줄이는 참고 정보다. 하지만 판매 확률 처방으로 쓰려면
-# 동종군 안에서 가격 위치가 전환율을 갈라야 한다. 현재 기준에서는 가격 위치별 전환율이 거의
-# 평평하므로, 가격군은 처방이 아니라 기준점으로 해석한다.
+# 가격군은 신규 셀러의 시세 불확실성을 줄이는 참고 정보다. 정확한 브랜드 기준 가격 위치와,
+# 화면에 보여주기 쉬운 넓은 시장 기준 가격 위치를 함께 확인한다. 전자는 엄밀하지만 1점물 특성상
+# 비교군이 작고, 후자는 덜 정밀하지만 신규 셀러에게 가격대 기준을 제공하기 쉽다.
 
 # %%
 price_df = lst.copy()
@@ -465,8 +514,57 @@ price_position_check = {
     ),
 }
 
+market_df = lst.copy()
+market_df["cond"] = market_df["condition"].fillna("NA")
+market_cols = ["brand_top", "category_l2", "cond"]
+g_market = market_df.groupby(market_cols)
+market_df["market_grp_n"] = g_market["price_final"].transform("size")
+market_df["market_grp_pct"] = g_market["price_final"].rank(pct=True)
+market_valid = market_df[market_df["market_grp_n"] >= 20].copy()
+market_valid["market_price_bin"] = pd.cut(
+    market_valid["market_grp_pct"],
+    [0, 0.25, 0.5, 0.75, 1.0],
+    labels=["하위25%(저가)", "25-50", "50-75", "상위25%(고가)"],
+)
+market_sellthrough_by_bin = market_valid.groupby("market_price_bin", observed=True)["is_sold"].mean()
+market_sold_pct = float(market_valid.loc[market_valid["is_sold"] == 1, "market_grp_pct"].mean())
+market_unsold_pct = float(market_valid.loc[market_valid["is_sold"] == 0, "market_grp_pct"].mean())
+q1 = market_valid.loc[market_valid["market_price_bin"].eq("하위25%(저가)"), "is_sold"]
+q4 = market_valid.loc[market_valid["market_price_bin"].eq("상위25%(고가)"), "is_sold"]
+market_q4_vs_q1_or = float((q4.sum() / (len(q4) - q4.sum())) / (q1.sum() / (len(q1) - q1.sum())))
+
+category_price_effect = {}
+for cat, g in market_valid.groupby("category_l2"):
+    if len(g) < 3000:
+        continue
+    rates = g.groupby("market_price_bin", observed=True)["is_sold"].mean()
+    if "하위25%(저가)" in rates and "상위25%(고가)" in rates:
+        category_price_effect[str(cat)] = {
+            "n": int(len(g)),
+            "low_q1": round(float(rates["하위25%(저가)"]), 3),
+            "high_q4": round(float(rates["상위25%(고가)"]), 3),
+            "q4_minus_q1": round(float(rates["상위25%(고가)"] - rates["하위25%(저가)"]), 3),
+        }
+category_price_effect = dict(
+    sorted(category_price_effect.items(), key=lambda kv: kv[1]["q4_minus_q1"])
+)
+market_price_position_check = {
+    "group_definition": "brand_top × category_l2 × condition; valid group n>=20",
+    "n_with_valid_group": int(len(market_valid)),
+    "coverage": round(float(len(market_valid) / len(market_df)), 3),
+    "sellthrough_by_market_price_bin": {
+        str(k): round(float(v), 3) for k, v in market_sellthrough_by_bin.items()
+    },
+    "sold_vs_unsold_mean_pct": [round(market_sold_pct, 3), round(market_unsold_pct, 3)],
+    "q4_vs_q1_OR": round(market_q4_vs_q1_or, 3),
+    "category_l2_effects_n_ge3000": category_price_effect,
+}
+print("시장 기준 가격 백분위별 전환율:")
+print((market_sellthrough_by_bin * 100).round(1).to_string())
+print("시장 기준 Q4 vs Q1 OR:", round(market_q4_vs_q1_or, 3))
+
 # %% [markdown]
-# ## 6. 토픽 효과의 통제 검증
+# ## 7. 토픽 효과의 통제 검증
 #
 # 가장 낮은 전환율을 보인 토픽이 가격이나 카테고리 구성 차이만으로 낮아졌는지 확인한다.
 # 매물 단위 로지스틱 회귀에 토픽 더미와 가격, 카테고리, 컨디션, 등록 경과일을 함께 넣는다.
@@ -503,7 +601,7 @@ topic_control = {
 print("토픽 통제 검증:", topic_control)
 
 # %% [markdown]
-# ## 7. 저장
+# ## 8. 저장
 
 # %%
 sel_c[["seller_id", "archetype", "topic_dominance"]].to_parquet(
@@ -545,10 +643,12 @@ h3 = {
         round(float(profile["sell_through"].max()), 3),
     ],
     "wish_sell_taste": WST,
+    "low_history_wishlist_availability": low_history_wishlist,
     "topic_control": topic_control,
     "onboarding_poc": onboarding_poc,
     "price_band_coverage": price_band_coverage,
     "price_position_check": price_position_check,
+    "market_price_position_check": market_price_position_check,
 }
 
 (ROOT / "results" / "h3.json").write_text(
@@ -556,22 +656,31 @@ h3 = {
 )
 (ROOT / "results" / "taste_matching.json").write_text(
     json.dumps({
-        "premise": "위시-셀링 브랜드 코사인 lift 8.9× (results/h3.json:wish_sell_taste). 동일 사용자 내 횡단면 정렬",
+        "premise": "위시-셀링 취향은 횡단면에서 무작위보다 높게 정렬된다. 브랜드 공간 8.9×는 보조 수치이고, 원 브랜드 검색의 핵심 검증은 이웃 셀링 일치도 5.3×다.",
         "demand_taste_hhi_median": round(float(wish_hhi.median()), 3),
         "supply_sell_hhi_median": round(float(sell_hhi.median()), 3),
+        "low_history_wishlist_availability": low_history_wishlist,
         "onboarding_poc": onboarding_poc,
         "price_band_coverage_bcc": price_band_coverage["brand_category_condition"],
         "price_band_coverage_bc": price_band_coverage["brand_category"],
         "caveats": (
             "단면 자료(종단 아님; 기존 셀러로 프록시 검증); 성공 셀러 cutoff는 참조 후보 전환율 "
             "상위 1/3 규칙이지 신규 셀러 기대 전환율 상승폭 아님; 위시 주체=셀러(구매자 아님); "
-            "브랜드 단위 근사; comp 밴드는 시세 투명성 도구(가격위치는 sell-through 거의 못 가름, "
-            "p3_staleness.json). 가격·할인 탄력성은 A/B 필요"
+            "브랜드 단위 근사; comp 밴드는 시세 투명성 도구이며 넓은 시장 기준 가격 위치는 "
+            "고가 구간의 낮은 전환 신호를 일부 포착함(p3_staleness.json). 가격·할인 탄력성은 A/B 필요"
         ),
     }, ensure_ascii=False, indent=2),
     encoding="utf-8",
 )
 (ROOT / "results" / "p3_staleness.json").write_text(
-    json.dumps(price_position_check, ensure_ascii=False, indent=2), encoding="utf-8"
+    json.dumps(
+        {
+            "exact_price_position_check": price_position_check,
+            "market_price_position_check": market_price_position_check,
+        },
+        ensure_ascii=False,
+        indent=2,
+    ),
+    encoding="utf-8",
 )
 print("saved. NMF topics:", best_k, "| sell-through range:", h3["sellthrough_range_across_archetypes"])

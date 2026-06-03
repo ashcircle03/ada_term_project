@@ -4,7 +4,7 @@
   data/cache/features_listing.parquet  (매물단위, 필터 후 ~280k)
   data/cache/features_seller.parquet   (셀러단위, ~11k)
 
-설계 결정 (계획서):
+설계 결정:
   - 결과변수 is_sold. view_count/like_count는 누수 → 피처 테이블에서 아예 제외.
   - gender는 category_l1과 중복 → 제외.
   - _pending_ placeholder, created_at/description NULL 행 제외 (N 로그 출력).
@@ -123,15 +123,15 @@ def main():
     seller = build_seller_features(raw)
     seller.to_parquet(CACHE_DIR / "features_seller.parquet", index=False)
 
-    # --- sanity check (계획서 EDA 수치와 대조) ---
+    # --- sanity check (보고서 핵심 EDA 수치와 대조) ---
     print("\n=== SANITY ===")
-    print(f"  전체 전환율: {listing['is_sold'].mean():.1%}  (기대 ~21%)")
+    print(f"  전체 전환율: {listing['is_sold'].mean():.1%}  (보고서 기준 ~21%)")
     print(f"  relative_price_z 계산된 비율: {listing['relative_price_z'].notna().mean():.1%}")
     print(f"  age_days 중앙값: {listing['age_days'].median():.0f}일")
     pg = pd.cut(listing["n_photos"], [-1, 2, 5, 10], labels=["<=2", "3-5", "6+"])
-    print("  사진수 구간별 전환율 (기대: <=2 최고):")
+    print("  사진수 구간별 전환율 (보고서 원시 역설: <=2 최고):")
     print(listing.groupby(pg, observed=True)["is_sold"].mean().round(3).to_string())
-    print(f"  zero-sale 셀러 비율: {(seller['n_sold']==0).mean():.1%}  (기대 ~16%)")
+    print(f"  zero-sale 셀러 비율: {(seller['n_sold']==0).mean():.1%}  (보고서 기준 ~16%)")
 
 
 if __name__ == "__main__":

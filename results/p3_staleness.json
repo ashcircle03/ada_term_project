@@ -1,17 +1,103 @@
 {
-  "group_definition": "brand × category_l1 × condition; valid group n>=5",
-  "n": 284654,
-  "n_with_valid_group": 258442,
-  "coverage_bcc_raw_condition": 0.908,
-  "sellthrough_by_within_group_price_bin": {
-    "하위25%(저가)": 0.192,
-    "25-50": 0.186,
-    "50-75": 0.181,
-    "상위25%(고가)": 0.199
+  "exact_price_position_check": {
+    "group_definition": "brand × category_l1 × condition; valid group n>=5",
+    "n": 284654,
+    "n_with_valid_group": 258442,
+    "coverage_bcc_raw_condition": 0.908,
+    "sellthrough_by_within_group_price_bin": {
+      "하위25%(저가)": 0.192,
+      "25-50": 0.186,
+      "50-75": 0.181,
+      "상위25%(고가)": 0.199
+    },
+    "sold_vs_unsold_mean_pct": [
+      0.519,
+      0.509
+    ],
+    "conclusion": "현재의 브랜드·대분류·컨디션 기준 동종 가격 위치는 전환율을 거의 가르지 못한다. 따라서 가격군은 판매 확률 처방이 아니라 시세 불확실성 완화 정보로 해석한다."
   },
-  "sold_vs_unsold_mean_pct": [
-    0.519,
-    0.509
-  ],
-  "conclusion": "현재의 브랜드·대분류·컨디션 기준 동종 가격 위치는 전환율을 거의 가르지 못한다. 따라서 가격군은 판매 확률 처방이 아니라 시세 불확실성 완화 정보로 해석한다."
+  "market_price_position_check": {
+    "group_definition": "brand_top × category_l2 × condition; valid group n>=20",
+    "n_with_valid_group": 279898,
+    "coverage": 0.983,
+    "sellthrough_by_market_price_bin": {
+      "하위25%(저가)": 0.228,
+      "25-50": 0.223,
+      "50-75": 0.212,
+      "상위25%(고가)": 0.196
+    },
+    "sold_vs_unsold_mean_pct": [
+      0.485,
+      0.506
+    ],
+    "q4_vs_q1_OR": 0.829,
+    "category_l2_effects_n_ge3000": {
+      "가방": {
+        "n": 14940,
+        "low_q1": 0.357,
+        "high_q4": 0.199,
+        "q4_minus_q1": -0.158
+      },
+      "액세서리": {
+        "n": 14430,
+        "low_q1": 0.393,
+        "high_q4": 0.285,
+        "q4_minus_q1": -0.109
+      },
+      "라이프": {
+        "n": 5058,
+        "low_q1": 0.329,
+        "high_q4": 0.24,
+        "q4_minus_q1": -0.089
+      },
+      "주얼리": {
+        "n": 7726,
+        "low_q1": 0.334,
+        "high_q4": 0.273,
+        "q4_minus_q1": -0.061
+      },
+      "하의": {
+        "n": 41722,
+        "low_q1": 0.229,
+        "high_q4": 0.192,
+        "q4_minus_q1": -0.037
+      },
+      "아우터": {
+        "n": 68086,
+        "low_q1": 0.218,
+        "high_q4": 0.184,
+        "q4_minus_q1": -0.033
+      },
+      "신발": {
+        "n": 27692,
+        "low_q1": 0.253,
+        "high_q4": 0.221,
+        "q4_minus_q1": -0.032
+      },
+      "상의": {
+        "n": 79158,
+        "low_q1": 0.142,
+        "high_q4": 0.142,
+        "q4_minus_q1": -0.0
+      },
+      "모자": {
+        "n": 12076,
+        "low_q1": 0.28,
+        "high_q4": 0.304,
+        "q4_minus_q1": 0.024
+      },
+      "치마": {
+        "n": 4312,
+        "low_q1": 0.292,
+        "high_q4": 0.324,
+        "q4_minus_q1": 0.031
+      },
+      "원피스": {
+        "n": 3163,
+        "low_q1": 0.279,
+        "high_q4": 0.375,
+        "q4_minus_q1": 0.096
+      }
+    }
+  }
 }

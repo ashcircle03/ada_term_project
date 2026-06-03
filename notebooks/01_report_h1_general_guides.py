@@ -1,9 +1,9 @@
 # %% [markdown]
-# # 01 · H1 · 일반 등록 가이드는 판매를 돕는가 (통계·준인과)
+# # 01 · H1 · 수량형 등록 권고는 판매를 돕는가 (통계·준인과)
 #
-# **가설.** "사진을 많이, 설명을 자세히"라는 일반 권고와 판매의 음(-)의 상관은,
-# 어려운 매물일수록 사진·설명에 공을 들이는 역선택 등 교란 때문이며, 매물 속성을
-# 통제하면 권고를 지지하는 독립적 효과는 확인하기 어렵다.
+# **가설.** "사진을 많이, 설명을 길게"라는 수량형 권고와 판매의 음(-)의 상관은,
+# 어려운 매물일수록 사진·설명에 공을 들이는 역선택 등 교란 때문일 수 있다. 매물 속성을
+# 통제하면 사진 장수와 설명 길이의 독립적 처방 효과는 관측 자료만으로 확인하기 어렵다.
 #
 # **왜 이 방법인가.** 결과(판매 여부)가 0/1이므로 **로지스틱 회귀**로 각 변수가 판매
 # 성사의 *승산(odds)* 을 몇 배로 바꾸는지를 **오즈비(OR)** 로 추정한다(OR>1이면 판매에
@@ -16,6 +16,10 @@
 #
 # **유의수준.** 표본이 28만여 건으로 매우 커 작은 효과도 쉽게 유의해진다. 따라서
 # α=0.05로 두되 p-값만 보지 않고 **효과 크기(OR이 1에서 얼마나 떨어졌는가)** 를 함께 본다.
+#
+# **범위.** 이 노트북은 사진의 밝기·배경·해상도·착용 핏 같은 품질을 검증하지 않는다.
+# 따라서 결과는 "좋은 사진이 중요하지 않다"가 아니라, 사진 장수와 설명 길이만으로
+# 독립적인 처방 효과를 입증하기 어렵다는 의미로 해석한다.
 #
 # **구성:** (1) raw vs 통제 계수 비교, (2) 표현 레버별 OR, (3) "사진 3장+" 임계 검정,
 # (4) PSM 처치효과(ATT), (5) 성숙 코호트와 E-value 민감도. 산출 수치는 results/h1.json.
@@ -68,7 +72,7 @@ print("N =", len(lst))
 #   교란이라 통제에 넣는다.
 # - **처치 정의.** PSM 처치 `compliant = 사진≥3 & 설명≥150자`는 사진 가이드의 "3장 이상" 권고와
 #   설명을 충분히 작성했다는 조작적 기준을 결합한 것이다. 설명 150자는 플랫폼의 명시 임계값이 아니라
-#   짧은 설명과 중간 이상 설명을 가르는 분석 기준이므로, 처치효과는 "일반 권고 준수"의 근사로만 해석한다.
+#   짧은 설명과 중간 이상 설명을 가르는 분석 기준이므로, 처치효과는 "수량형 권고 준수"의 근사로만 해석한다.
 # - **caliper 0.02 · 표준화.** 공변량은 표준화한 뒤 성향점수를 추정하고, 성향점수 확률거리 0.02 안에서
 #   최근접 매칭한다. 표현 변수는 z-표준화해 계수를 'SD 1 증가당 OR'로 해석한다.
 
@@ -88,11 +92,14 @@ lst["z_relprice"] = z(lst["relative_price_z"])
 kw = ["kw_measure", "kw_flaw", "kw_material", "kw_purchase", "kw_usage", "kw_wash"]
 y = lst["is_sold"].astype(int)
 
-def design(cols, cats=()):
-    X = lst[cols].copy()
-    for c in cats:
-        X = pd.concat([X, pd.get_dummies(lst[c], prefix=c, drop_first=True)], axis=1)
-    return sm.add_constant(X.astype(float))
+def dummies(frame, col, prefix=None, drop_first=True):
+    return pd.get_dummies(frame[col], prefix=prefix or col, drop_first=drop_first)
+
+
+def design(cols, cats=(), frame=lst):
+    parts = [frame[cols].copy()]
+    parts.extend(dummies(frame, c) for c in cats)
+    return sm.add_constant(pd.concat(parts, axis=1).astype(float))
 
 def fit(X):
     return sm.Logit(y, X).fit(disp=0, method="lbfgs", maxiter=200)
@@ -123,7 +130,7 @@ print(json.dumps(contrast, ensure_ascii=False, indent=2))
 print(f"\nPseudo R² raw={m_raw.prsquared:.4f}  controlled={m_ctrl.prsquared:.4f}")
 
 # %% [markdown]
-# ## 3. 가이드 항목별 통제 후 효과 (OR, 95% CI)
+# ## 3. 수량형·키워드 레버별 통제 후 효과 (OR, 95% CI)
 #
 # 통제 모델에서 셀러가 통제 가능한 표현 레버들의 방향·유의성.
 
@@ -155,11 +162,11 @@ fig.tight_layout(); fig.savefig(FIG / "h1_levers_or.png", bbox_inches="tight"); 
 # %%
 lst["photo_grp"] = pd.cut(lst["n_photos"], [-1, 2, 5, 10], labels=["le2", "p3_5", "p6plus"])
 X_thr = sm.add_constant(pd.concat([
-    pd.get_dummies(lst["photo_grp"], prefix="ph", drop_first=True),
+    dummies(lst, "photo_grp", prefix="ph"),
     lst[["z_desclen", *kw, "z_logprice", "z_relprice", "rel_price_missing", "z_age"]],
-    pd.get_dummies(lst["brand_top"], prefix="b", drop_first=True),
-    pd.get_dummies(lst["category_l1"], prefix="c", drop_first=True),
-    pd.get_dummies(lst["condition"], prefix="cond", drop_first=True),
+    dummies(lst, "brand_top", prefix="b"),
+    dummies(lst, "category_l1", prefix="c"),
+    dummies(lst, "condition", prefix="cond"),
 ], axis=1).astype(float))
 m_thr = fit(X_thr)
 thr = {g: {"OR": round(np.exp(m_thr.params[g]), 3), "p": round(m_thr.pvalues[g], 4)}
@@ -179,9 +186,9 @@ print(json.dumps(thr, ensure_ascii=False, indent=2))
 lst["compliant"] = ((lst["n_photos"] >= 3) & (lst["desc_len"] >= 150)).astype(int)
 cov = pd.concat([
     lst[["z_logprice", "z_age", "z_relprice"]],
-    pd.get_dummies(lst["brand_top"], prefix="b", drop_first=True),
-    pd.get_dummies(lst["category_l1"], prefix="c", drop_first=True),
-    pd.get_dummies(lst["condition"], prefix="cond", drop_first=True),
+    dummies(lst, "brand_top", prefix="b"),
+    dummies(lst, "category_l1", prefix="c"),
+    dummies(lst, "condition", prefix="cond"),
 ], axis=1).astype(float)
 psm_df = pd.concat([lst[["is_sold", "compliant"]], cov], axis=1)
 att, diag = fl.propensity_match(psm_df, "compliant", list(cov.columns), caliper=0.02)
@@ -214,9 +221,9 @@ def fit_or_for(df):
         base[k] = df[k]
     X = pd.concat([
         base,
-        pd.get_dummies(df.brand_top, prefix="b", drop_first=True),
-        pd.get_dummies(df.category_l1, prefix="c", drop_first=True),
-        pd.get_dummies(df.condition, prefix="cond", drop_first=True),
+        dummies(df, "brand_top", prefix="b"),
+        dummies(df, "category_l1", prefix="c"),
+        dummies(df, "condition", prefix="cond"),
     ], axis=1).astype(float)
     m = sm.Logit(df.is_sold.values, sm.add_constant(X)).fit(disp=0, method="lbfgs", maxiter=300)
     return float(np.exp(m.params["z_photos"])), float(np.exp(m.params["z_desc"]))
@@ -282,8 +289,10 @@ h1 = {
     "n": int(len(lst)),
     "raw_vs_controlled": contrast,
     "pseudo_r2": {"raw": round(m_raw.prsquared, 4), "controlled": round(m_ctrl.prsquared, 4)},
-    "lever_odds_ratios": {lab: {"OR": round(r["OR"], 3), "p": round(r["p"], 4)}
-                          for lab, r in eff.iterrows()},
+    "lever_odds_ratios": {
+        lab: {"OR": round(float(r["OR"]), 3), "p": round(float(r["p"]), 4)}
+        for lab, r in eff[["OR", "p"]].to_dict(orient="index").items()
+    },
     "photo_threshold_vs_le2": thr,
     "psm": {"naive_diff": round(float(naive), 4), "att": round(float(att), 4), **diag},
     "cohort_robustness": cohort_robustness,

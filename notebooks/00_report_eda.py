@@ -1,9 +1,10 @@
 # %% [markdown]
-# # 00 · EDA · 문제 정의 (FruitsFamily 유동성 위기)
+# # 00 · EDA · 문제 정의 (FruitsFamily의 낮은 판매 전환)
 #
-# **문제:** 빈티지 1점물 C2C에서 매물 대부분이 안 팔린다. 그런데 플랫폼은
-# 전 셀러에게 동일한 일반 안내("사진 많이, 설명 길게")만 준다. 이 노트북은
-# 그 일반 안내가 데이터와 충돌함을 보인다 (가격대 통제 후에도).
+# **문제:** 빈티지 1점물 C2C에서 매물 대부분이 판매로 전환되지 않는다. 그런데 플랫폼은
+# 전 셀러에게 동일한 수량형 등록 안내("사진 많이, 설명 길게")를 제공한다. 이 노트북은
+# 낮은 판매 전환의 규모와, 수량형 안내가 원시 자료에서 기대와 반대로 보이는 현상을 확인한다.
+# 이는 인과 결론이 아니라 H1/H2에서 검증할 문제 제기다.
 #
 # 결과변수: `is_sold` (매칭 성공). 속도 지표는 아니며, 연령으로도 안 팔리는 매물이 다수다.
 
@@ -74,7 +75,7 @@ print("listing:", lst.shape, "| seller:", sel.shape)
 print("전체 전환율:", f"{lst['is_sold'].mean():.1%}")
 
 # %% [markdown]
-# ## 1. 유동성 위기. 5개 중 4개는 안 팔린다, 시간도 못 푼다
+# ## 1. 낮은 판매 전환. 5개 중 4개는 미판매로 남는다
 #
 # 연령이 쌓여도 전환율은 ~23%에서 정체 → *속도*가 아니라 **매칭** 문제.
 
@@ -143,7 +144,7 @@ cum = np.cumsum(np.sort(sel["n_sold"].values)) / sel["n_sold"].sum()
 x = np.linspace(0, 1, len(cum))
 
 # %% [markdown]
-# ## 3. 핵심 모순. 일반 안내가 데이터와 충돌한다
+# ## 3. 핵심 모순. 수량형 안내가 원시 자료에서 기대와 반대로 보인다
 #
 # "사진 많이"는 전 가격대에서 **역방향**, "설명 길게"도 마찬가지.
 # 단, 이 결과는 raw 상관이다. 역선택(안 팔릴 매물에 노력 집중) 가능성은 H1/H2에서 분리한다.
@@ -167,7 +168,7 @@ ax[1].set(title="설명 길이↑ → 전환율↓", ylabel="sold %", xlabel="de
 fig.tight_layout(); fig.savefig(FIG / "eda_paradox.png", bbox_inches="tight"); plt.close(fig)
 
 # %% [markdown]
-# ## 4. 계획서 EDA 수치와 대조 (sanity) + results 저장
+# ## 4. 보고서 EDA 요약 저장
 
 # %%
 summary = {
@@ -189,4 +190,4 @@ print(json.dumps(summary, ensure_ascii=False, indent=2))
 (ROOT / "results").mkdir(exist_ok=True)
 (ROOT / "results" / "eda.json").write_text(
     json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
-print("\n계획서 기대: 미판매 78.8% / zero-sale 15.9% / top10 31.4% / ≤2장 최고")
+print("\n보고서 핵심 EDA: 미판매율, 90일 초과 미판매, zero-sale 셀러, 사진·설명 원시 역설")
