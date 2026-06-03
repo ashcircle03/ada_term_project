@@ -36,16 +36,17 @@ export MPLCONFIGDIR=.cache/matplotlib
 
 ## Reproducing Report Outputs
 
-최종 보고서 수치와 그림은 Git 추적 대상인 `results/*.json`과 `results/figures/*.png`에 들어 있습니다. 원자료부터 다시 실행하려면 Git LFS 파일인 `data/fruitsfamily.db`가 필요합니다.
+최종 보고서 수치와 그림은 Git 추적 대상인 `results/*.json`과 `results/figures/*.png`에 들어 있습니다. 제출용 ZIP 또는 clone에는 재현용 SQLite DB인 `data/fruitsfamily.db`가 포함되어 있어 크롤링 없이 분석을 실행할 수 있습니다.
 
 ```bash
-git lfs pull
 python -m analysis.build_features
 python -m analysis.nbmake notebooks/00_report_eda.py
 python -m analysis.nbmake notebooks/01_report_h1_general_guides.py
 python -m analysis.nbmake notebooks/02_report_h2_structural_signals.py
 python -m analysis.nbmake notebooks/03_report_h3_wishlist_onboarding.py
 ```
+
+`data/fruitsfamily.db`가 134B 정도의 LFS pointer 파일이면 Git LFS 객체가 내려오지 않은 상태입니다. 이때만 `git lfs pull`을 실행한 뒤 다시 진행합니다.
 
 `data/cache/`와 `data/raw_html/`은 재생성 가능한 캐시·원본 HTML이라 ZIP에는 들어가지 않습니다.
 

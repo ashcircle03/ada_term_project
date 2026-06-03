@@ -6,10 +6,9 @@
 - `raw_html/`: 크롤링 중 저장되는 원본 HTML
 - `cache/`: `analysis.build_features`와 노트북이 생성하는 parquet 캐시
 
-원자료부터 재실행하려면 먼저 LFS 파일을 받은 뒤 다음 순서로 피처와 노트북 산출물을 재생성합니다.
+원자료부터 재실행하려면 다음 순서로 피처와 노트북 산출물을 재생성합니다. `fruitsfamily.db`가 134B 정도의 LFS pointer 파일이면 `git lfs pull`을 먼저 실행합니다.
 
 ```bash
-git lfs pull
 python -m analysis.build_features
 python -m analysis.nbmake notebooks/00_report_eda.py
 python -m analysis.nbmake notebooks/01_report_h1_general_guides.py
