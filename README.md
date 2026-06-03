@@ -13,8 +13,9 @@
   - `03_report_h3_wishlist_onboarding.*`: 위시리스트 기반 취향 정렬과 초기 안내 가설
 - `results/`: 보고서에 인용한 JSON 결과와 그림
 - `data/README.md`: 원자료·캐시 생성 위치 안내
+- `data/fruitsfamily.db`: 재현용 SQLite DB, Git LFS 추적 대상
 
-`archive/`, `AGENTS.md`, `REPORT.md`, dot-prefixed 로컬 경로는 제출용 GitHub ZIP에서 제외합니다. `data/` 경로는 포함하되 실제 DB, raw HTML, parquet 캐시는 제외합니다. `REPORT.md`는 로컬 보고서 초안이며, 최종 보고서는 별도 파일로 제출합니다.
+`archive/`, `AGENTS.md`, `REPORT.md`, dot-prefixed 로컬 경로는 제출용 GitHub ZIP에서 제외합니다. `data/` 경로에는 LFS DB와 안내 파일만 포함하고, raw HTML과 parquet 캐시는 제외합니다. `REPORT.md`는 로컬 보고서 초안이며, 최종 보고서는 별도 파일로 제출합니다.
 
 ## Environment
 
@@ -35,9 +36,10 @@ export MPLCONFIGDIR=.cache/matplotlib
 
 ## Reproducing Report Outputs
 
-최종 보고서 수치와 그림은 Git 추적 대상인 `results/*.json`과 `results/figures/*.png`에 들어 있습니다. 원자료부터 다시 실행하려면 SQLite 원천 데이터가 필요합니다.
+최종 보고서 수치와 그림은 Git 추적 대상인 `results/*.json`과 `results/figures/*.png`에 들어 있습니다. 원자료부터 다시 실행하려면 Git LFS 파일인 `data/fruitsfamily.db`가 필요합니다.
 
 ```bash
+git lfs pull
 python -m analysis.build_features
 python -m analysis.nbmake notebooks/00_report_eda.py
 python -m analysis.nbmake notebooks/01_report_h1_general_guides.py
@@ -45,7 +47,7 @@ python -m analysis.nbmake notebooks/02_report_h2_structural_signals.py
 python -m analysis.nbmake notebooks/03_report_h3_wishlist_onboarding.py
 ```
 
-`data/fruitsfamily.db`, `data/cache/`, `data/raw_html/`은 원자료·캐시 파일이라 GitHub ZIP에는 들어가지 않습니다. 따라서 ZIP만으로는 보고서 산출물을 확인할 수 있지만, 원자료 수집부터 완전 재실행하려면 크롤러로 DB를 다시 구축하거나 별도 데이터 파일을 제공해야 합니다.
+`data/cache/`와 `data/raw_html/`은 재생성 가능한 캐시·원본 HTML이라 ZIP에는 들어가지 않습니다.
 
 ## Crawler Commands
 

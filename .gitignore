@@ -7,6 +7,7 @@ REPORT*.txt
 # dot-prefixed 로컬 경로
 .*
 !.gitignore
+!.gitattributes
 
 # 환경
 .conda/
@@ -19,6 +20,7 @@ __pycache__/
 # data/ 경로는 README만 제출 ZIP에 포함하고, 원자료·캐시는 제외
 data/*
 !data/README.md
+!data/fruitsfamily.db
 
 # 크롤링 raw HTML (336MB, 너무 큼)
 data/raw_html/
@@ -36,7 +38,6 @@ logs/
 # Office 임시 잠금 파일
 ~$*.docx
 
-# DB (190MB+, 크롤할 때마다 변경 → git 추적 제외. 로컬 보존/재크롤로 충분)
-data/fruitsfamily.db
+# DB 보조 파일
 data/fruitsfamily.db-wal
 data/fruitsfamily.db-shm
